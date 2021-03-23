@@ -1,22 +1,15 @@
 package sg.acecom.track.systempest.adapter;
 
 import android.app.Activity;
-import android.app.Dialog;
-import android.net.Uri;
-import android.support.v7.widget.RecyclerView;
-import android.util.Log;
+
+import androidx.recyclerview.widget.RecyclerView;
+
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.Window;
 import android.view.animation.AlphaAnimation;
-import android.widget.Button;
-import android.widget.ImageView;
 import android.widget.TextView;
 
-import com.bumptech.glide.Glide;
-
-import java.io.File;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
@@ -24,9 +17,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
-import sg.acecom.track.systempest.JobsDetailActivity;
 import sg.acecom.track.systempest.R;
-import sg.acecom.track.systempest.model.Images;
 import sg.acecom.track.systempest.model.Pests;
 import sg.acecom.track.systempest.util.MyPreferences;
 

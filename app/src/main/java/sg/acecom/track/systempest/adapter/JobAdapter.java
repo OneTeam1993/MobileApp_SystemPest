@@ -5,15 +5,14 @@ import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.net.Uri;
-import android.support.v7.widget.CardView;
-import android.support.v7.widget.RecyclerView;
-import android.text.Html;
+
+import androidx.recyclerview.widget.RecyclerView;
+
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.AlphaAnimation;
 import android.widget.Button;
-import android.widget.ImageView;
 import android.widget.TextView;
 
 import java.text.ParseException;
@@ -41,7 +40,7 @@ public class JobAdapter extends RecyclerView.Adapter<JobAdapter.MyViewHolder>{
     private final static int FADE_DURATION = 100; //FADE_DURATION in milliseconds
 
     public class MyViewHolder extends RecyclerView.ViewHolder {
-        public TextView jobDateTime, jobAddress, jobCustomer, jobPest;
+        public TextView jobDateTime, jobAddress, jobCustomer, jobPest, jobTechnician, jobFormType;
         public Button buttonView, buttonAccept, buttonRoute;
         public View jobView;
 
@@ -52,6 +51,8 @@ public class JobAdapter extends RecyclerView.Adapter<JobAdapter.MyViewHolder>{
             jobAddress = view.findViewById(R.id.jobAddress);
             jobCustomer = view.findViewById(R.id.jobCustomer);
             jobPest = view.findViewById(R.id.jobPest);
+            jobTechnician = view.findViewById(R.id.jobTechnician);
+            jobFormType = view.findViewById(R.id.jobFormType);
             buttonView = view.findViewById(R.id.buttonView);
             buttonAccept = view.findViewById(R.id.buttonAccept);
             buttonRoute = view.findViewById(R.id.buttonRoute);
@@ -83,6 +84,22 @@ public class JobAdapter extends RecyclerView.Adapter<JobAdapter.MyViewHolder>{
         holder.jobAddress.setText(jobs.getUnit() + ", " + jobs.getDestination() + ", " + jobs.getPostal());
         holder.jobCustomer.setText(jobs.getPIC());
         holder.jobPest.setText(jobs.getPest());
+        holder.jobTechnician.setText(jobs.getTechnician());
+
+        switch(jobs.getFormType()){
+            case(1):
+                holder.jobFormType.setText("System Pest Singapore");
+                break;
+
+            case(2):
+                holder.jobFormType.setText("System Pest Malaysia");
+                break;
+
+            case(3):
+                holder.jobFormType.setText("Asia White Ants");
+                break;
+
+        }
 
         switch(jobs.getFlag()){
             case(0):
@@ -99,8 +116,8 @@ public class JobAdapter extends RecyclerView.Adapter<JobAdapter.MyViewHolder>{
 
             case(2):
                 holder.jobView.setBackgroundResource(R.color.job_status_scheduled);
-                holder.buttonView.setVisibility(View.GONE);
-                holder.buttonAccept.setVisibility(View.VISIBLE);
+                holder.buttonView.setVisibility(View.VISIBLE);
+                holder.buttonAccept.setVisibility(View.GONE);
                 break;
 
             case(3):
@@ -173,9 +190,12 @@ public class JobAdapter extends RecyclerView.Adapter<JobAdapter.MyViewHolder>{
                 pref.savePreferences("jobPest",jobs.getPest());
                 pref.savePreferences("AreaCovered",jobs.getAreaCovered());
                 pref.savePreferences("jobReferenceNo",jobs.getReferenceNo());
+                pref.savePreferences("Technician",jobs.getTechnician());
+                pref.savePreferences("FormType", String.valueOf(jobs.getFormType()));
 
                 Intent intent = new Intent(mContext, JobsDetailActivity.class);
                 mContext.startActivity(intent);
+                mContext.finish();
             }
         });
 

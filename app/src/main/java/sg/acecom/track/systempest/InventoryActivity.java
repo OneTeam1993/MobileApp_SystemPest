@@ -14,12 +14,12 @@ import android.graphics.RectF;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
-import android.support.annotation.Nullable;
-import android.support.design.widget.FloatingActionButton;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.DefaultItemAnimator;
-import android.support.v7.widget.LinearLayoutManager;
-import android.support.v7.widget.RecyclerView;
+import androidx.annotation.Nullable;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.DefaultItemAnimator;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -28,20 +28,11 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.widget.Button;
-import android.widget.CheckBox;
-import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.android.volley.AuthFailureError;
-import com.android.volley.Request;
-import com.android.volley.Response;
-import com.android.volley.VolleyError;
-import com.android.volley.toolbox.JsonArrayRequest;
-import com.android.volley.toolbox.StringRequest;
 import com.androidquery.AQuery;
 import com.androidquery.callback.AjaxCallback;
 import com.androidquery.callback.AjaxStatus;
@@ -57,23 +48,20 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.SocketException;
-import java.net.URLEncoder;
 import java.net.UnknownHostException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
+import java.util.TimeZone;
 
 import sg.acecom.track.systempest.adapter.InventoryAdapter;
 import sg.acecom.track.systempest.adapter.RecyclerTouchListener;
 import sg.acecom.track.systempest.database.DatabaseHelper;
 import sg.acecom.track.systempest.model.Inventory;
 import sg.acecom.track.systempest.util.AppConstant;
-import sg.acecom.track.systempest.util.AppController;
 import sg.acecom.track.systempest.util.MyPreferences;
 
 /**
@@ -91,7 +79,6 @@ public class InventoryActivity extends AppCompatActivity implements View.OnClick
     MyPreferences pref;
 
     private DatabaseHelper db;
-    boolean hasDuplicate = false;
 
     //Signature
     Bitmap bitmap;
@@ -111,6 +98,11 @@ public class InventoryActivity extends AppCompatActivity implements View.OnClick
     String signature_name;
     String final_signature_name;
 
+    AlertDialog.Builder alert_dialog;
+
+    Integer itemCount;
+
+
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -118,11 +110,7 @@ public class InventoryActivity extends AppCompatActivity implements View.OnClick
         pref = new MyPreferences(this);
         db = new DatabaseHelper(this);
 
-        // Dialog Function
-        dialog = new Dialog(InventoryActivity.this);
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        dialog.setContentView(R.layout.dialog_signature);
-        dialog.setCancelable(true);
+
 
         inventoryList = new ArrayList<>();
         adapter = new InventoryAdapter(this, inventoryList);
@@ -133,6 +121,8 @@ public class InventoryActivity extends AppCompatActivity implements View.OnClick
         recyclerInventory.setLayoutManager(new LinearLayoutManager(this));
         recyclerInventory.setItemAnimator(new DefaultItemAnimator());
         recyclerInventory.setAdapter(adapter);
+
+        itemCount = 0;
 
         buttonQrCode.setOnClickListener(this);
         buttonSubmit.setOnClickListener(this);
@@ -147,8 +137,8 @@ public class InventoryActivity extends AppCompatActivity implements View.OnClick
         //String itemName = getIntent().getStringExtra("itemName");
         String itemName = pref.getPreferences("itemName","");
         if(!itemName.equals("")){
+            Log.e("Item Name : ", itemName);
             loadInventoryItem(itemName);
-
             //loadItemInformation(itemName);
         }
         /**
@@ -177,7 +167,7 @@ public class InventoryActivity extends AppCompatActivity implements View.OnClick
     }
 
     public void loadStorage(){
-        Log.e("Inventory Storage : ", String.valueOf(db.getInventoryCount()));
+        //Log.e("Inventory Storage : ", String.valueOf(db.getInventoryCount()));
         if(db.getInventoryCount() > 0){
             loadStorageItem();
         }else{
@@ -198,7 +188,24 @@ public class InventoryActivity extends AppCompatActivity implements View.OnClick
 
             case(R.id.buttonSubmit):
 
-                dialogSignature();
+                boolean isEmpty = false;
+                System.out.println("INVENTORY = "  + inventoryList.size());
+                if(inventoryList.size() != 0) {
+                    for (int i = 0; i < inventoryList.size(); i++) {
+                        if (Integer.parseInt(inventoryList.get(i).getItemStockout()) == 0) {
+                            isEmpty = true;
+                        }
+                    }
+
+                    if (isEmpty == false) {
+                        dialogSignature();
+                    } else {
+                        showDialog();
+                        //Toast.makeText(InventoryActivity.this,"No item added!", Toast.LENGTH_SHORT).show();
+                    }
+                } else {
+                    showDialog2();
+                }
 
                 break;
 
@@ -212,10 +219,19 @@ public class InventoryActivity extends AppCompatActivity implements View.OnClick
     private void loadStorageItem(){
         inventoryList.clear();
         for(int i = 0; i < db.getAllInventory().size(); i++){
-            inventoryList.add(new Inventory(db.getAllInventory().get(i).getItemID(),db.getAllInventory().get(i).getItemName(),
+            inventoryList.add(new Inventory(db.getAllInventory().get(i).getItemID(),
+                    db.getAllInventory().get(i).getItemName(),
                     db.getAllInventory().get(i).getItemReference(),
                     db.getAllInventory().get(i).getItemQuantity(),
-                    db.getAllInventory().get(i).getItemPrice()));
+                    db.getAllInventory().get(i).getItemPrice(),
+                    db.getAllInventory().get(i).getItemUnit(),
+                    db.getAllInventory().get(i).getItemStockout()));
+
+            Log.e("INVENTORY LIST",inventoryList.get(i).getItemName());
+            Log.e("INVENTORY LIST",inventoryList.get(i).getItemReference());
+            Log.e("INVENTORY LIST",inventoryList.get(i).getItemQuantity());
+            Log.e("INVENTORY LIST",inventoryList.get(i).getItemPrice());
+            Log.e("INVENTORY LIST",inventoryList.get(i).getItemStockout());
         }
         adapter.notifyDataSetChanged();
     }
@@ -224,42 +240,51 @@ public class InventoryActivity extends AppCompatActivity implements View.OnClick
     {
         final String url = AppConstant.endpoint_url + "inventoryinfo?CompanyID=" + pref.getPreferences("driver_company_id","") + "&Reference=" + reference;
         AQuery aq = new AQuery(this);
+        System.out.println("URL = " + url);
         aq.ajax(url, String.class, new AjaxCallback<String>() {
             @Override
             public void callback(String url, String response, AjaxStatus status) {
+                System.out.println("Response = " + response);
+                System.out.println("Status = " + status.getMessage());
                 if (status.getMessage().equals("OK")) {
+                    boolean hasDuplicate = false;
+
                     try {
                         JSONArray ja = new JSONArray(response);
                         JSONObject obj = (JSONObject) ja.get(0);
                         Inventory inventory = new Inventory();
-
+                        Log.e("Inventory Count : ", String.valueOf(db.getInventoryCount()));
                         if(db.getInventoryCount() <= 0){
-                            insertInventory(obj.getInt("InventoryID"),obj.getString("Name"), obj.getString("Reference")
-                                    , obj.getString("Quantity"), obj.getString("Price"), obj.getString("Unit"));
+                            int qtt = obj.getInt("Quantity");
+                            if(qtt <= 0){
+                                showDialogNoStock();
+                            } else{
+                                insertInventory(obj.getInt("InventoryID"),obj.getString("Name"), obj.getString("Reference")
+                                        , obj.getString("Quantity"), obj.getString("Price"), obj.getString("Unit"), "0");
+                            }
                         }else{
-                            for(int i = 0; i < db.getAllInventory().size(); i++){
+                            int i;
+                            for(i = 0; i < db.getAllInventory().size(); i++){
                                 if(db.getAllInventory().get(i).getItemName().equals(obj.getString("Name"))){
                                     hasDuplicate = true;
-                                    Log.e("Found Duplicate","YES");
-                                    //i = db.getAllInventory().size();
                                 }
 
                                 if(i+1 == db.getAllInventory().size()){
                                     if(!hasDuplicate){
-                                        Log.e("NO Duplicate","NO");
-                                        insertInventory(obj.getInt("InventoryID"),obj.getString("Name"), obj.getString("Reference")
-                                                , obj.getString("Quantity"), obj.getString("Price"), obj.getString("Unit"));
-
-                                    }else{
-                                        Log.e("Has Duplicate","Yes");
-                                        Toast.makeText(InventoryActivity.this,"Item already existed in the list...", Toast.LENGTH_SHORT).show();
+                                        //Log.e("NO Duplicate","NO");
+                                        int qtt = obj.getInt("Quantity");
+                                        if(qtt <= 0){
+                                            showDialogNoStock();
+                                        } else{
+                                            insertInventory(obj.getInt("InventoryID"),obj.getString("Name"), obj.getString("Reference")
+                                                    , obj.getString("Quantity"), obj.getString("Price"), obj.getString("Unit"), "0");
+                                        }
                                     }
                                 }
                             }
                         }
 
                     } catch (JSONException e) {
-                        //Exit
                         Log.e("Error : ", String.valueOf(e));
                     }
                     pref.removePreferences("itemName");
@@ -270,11 +295,11 @@ public class InventoryActivity extends AppCompatActivity implements View.OnClick
         }); //End of Aquery
     }
 
-    private void loadItemInformation(String reference){
+    /*private void loadItemInformation(String reference){
 
         final String url = AppConstant.endpoint_url + "inventoryinfo?CompanyID=" + pref.getPreferences("driver_company_id","") + "&Reference=" + reference;
         //final String url = "http://track-asia.com" + "inventoryinfo?CompanyID=" + pref.getPreferences("driver_company_id","") + "&Reference=" + reference;
-        Log.e("Item URL : ", url);
+        //Log.e("Item URL : ", url);
         // prepare the Request
         JsonArrayRequest getRequest = new JsonArrayRequest(Request.Method.GET, url, null,
                 new Response.Listener<JSONArray>()
@@ -294,18 +319,18 @@ public class InventoryActivity extends AppCompatActivity implements View.OnClick
                                 for(int i = 0; i < db.getAllInventory().size(); i++){
                                     if(db.getAllInventory().get(i).getItemName().equals(obj.getString("Name"))){
                                         hasDuplicate = true;
-                                        Log.e("Found Duplicate","YES");
+                                        //Log.e("Found Duplicate","YES");
                                         //i = db.getAllInventory().size();
                                     }
 
                                     if(i+1 == db.getAllInventory().size()){
                                         if(!hasDuplicate){
-                                            Log.e("NO Duplicate","NO");
+                                            //Log.e("NO Duplicate","NO");
                                             insertInventory(obj.getInt("InventoryID"),obj.getString("Name"), obj.getString("Reference")
                                                     , obj.getString("Quantity"), obj.getString("Price"), obj.getString("Unit"));
 
                                         }else{
-                                            Log.e("Has Duplicate","Yes");
+                                            //Log.e("Has Duplicate","Yes");
                                             Toast.makeText(InventoryActivity.this,"Item already existed in the list...", Toast.LENGTH_SHORT).show();
                                         }
                                     }
@@ -336,11 +361,12 @@ public class InventoryActivity extends AppCompatActivity implements View.OnClick
         // Access the RequestQueue through your singleton class.
         AppController.getInstance().addToRequestQueue(getRequest);
     }
-
-    private void insertInventory(int itemID, String itemName, String itemReference, String itemQuantity, String itemPrice, String itemUnit){
+*/
+    private void insertInventory(int itemID, String itemName, String itemReference, String itemQuantity, String itemPrice, String itemUnit, String itemStockout){
         // inserting note in db and getting
         // newly inserted note id
-        long id = db.insertNote(itemID,itemName, itemReference, itemQuantity, itemPrice,itemUnit);
+        Log.e("INSERT",itemUnit);
+        long id = db.insertNote(itemID,itemName, itemReference, itemQuantity, itemPrice,itemUnit, itemStockout);
 
         // get the newly inserted note from db
         Inventory n = db.getNote(id);
@@ -371,15 +397,17 @@ public class InventoryActivity extends AppCompatActivity implements View.OnClick
 
         }
 
+        Log.e("PARAMS",params.toString());
+
         final String url = AppConstant.endpoint_url + "inventoryinfo?ID=" + itemID;
 
-        System.out.println(url);
+        //System.out.println(url);
 
         AQuery aq = new AQuery(this);
         aq.put(url, params, String.class, new AjaxCallback<String>() {
             @Override
             public void callback(String url, String response, AjaxStatus status) {
-                System.out.println(response);
+                //System.out.println(response);
                 if (status.getMessage().equals("OK")) {
 
                     }
@@ -388,13 +416,30 @@ public class InventoryActivity extends AppCompatActivity implements View.OnClick
                 .header("_method", "PUT"));
     }
 
+    public void updateItemCount(String action){
+        if(action.equals("Add")){
+            itemCount = itemCount + 1;
+        } else {
+            itemCount = itemCount - 1;
+        }
+    }
+
     private void postInventoryHistory(final int itemID, final String itemName, final String itemReference, final String itemPreviousQuantity,final String itemQuantity, final String itemStockOutQuantity) {
+
+        String format = "dd-MMM-yyyy hh:mm:ss";
+        final SimpleDateFormat sdf = new SimpleDateFormat(format);
+        sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+        String utcTime = sdf.format(new Date());
+
+        Log.e("UTCTIME",utcTime);
 
         Calendar cal = Calendar.getInstance();
         cal.setTime(Calendar.getInstance().getTime());
         cal.add(Calendar.HOUR, -8);
         Date eightHourBack = cal.getTime();
         String timestamp = new SimpleDateFormat("dd-MMM-yyyy hh:mm:ss", Locale.ENGLISH).format(eightHourBack);
+
+        Log.e("TIMESTAMP",timestamp);
 
         JSONObject params = new JSONObject();
 
@@ -419,23 +464,25 @@ public class InventoryActivity extends AppCompatActivity implements View.OnClick
 
         }
 
+        Log.e("PARAMSPOST",params.toString());
+
         final String url = AppConstant.endpoint_url + "inventoryhistoryinfo";
 
-        System.out.println(url);
+        //System.out.println(url);
 
         AQuery aq = new AQuery(this);
         aq.post(url, params, String.class, new AjaxCallback<String>() {
             @Override
             public void callback(String url, String response, AjaxStatus status) {
-                System.out.println(response);
+                //System.out.println(response);
                 if (status.getMessage().equals("OK")) {
                     try{
                         JSONObject ja = new JSONObject(response);
                         final_signature_name = ja.getString("InventoryHistoryID");
-                        new InventoryActivity.uploadSupervisorSignatureFTP().execute();
+                        new InventoryActivity.uploadSupervisorSignatureFTP(final_signature_name).execute();
 
                     }catch(Exception e){
-
+                        Log.e("Error : ", String.valueOf(e));
                     }
 
                 }
@@ -443,6 +490,7 @@ public class InventoryActivity extends AppCompatActivity implements View.OnClick
         }.header("Content-Type", "application/x-www-form-urlencoded")
                 .header("_method", "POST"));
     }
+
 
     public class signature extends View {
 
@@ -465,8 +513,8 @@ public class InventoryActivity extends AppCompatActivity implements View.OnClick
         }
 
         public void save(View v, String StoredPath) {
-            Log.v("log_tag", "Width: " + v.getWidth());
-            Log.v("log_tag", "Height: " + v.getHeight());
+            //Log.v("log_tag", "Width: " + v.getWidth());
+            //Log.v("log_tag", "Height: " + v.getHeight());
             if (bitmap == null) {
                 bitmap = Bitmap.createBitmap(mContent.getWidth(), mContent.getHeight(), Bitmap.Config.RGB_565);
             }
@@ -570,6 +618,13 @@ public class InventoryActivity extends AppCompatActivity implements View.OnClick
 
     // Function for Digital Signature
     public void dialogSignature() {
+
+        // Dialog Function
+        dialog = new Dialog(InventoryActivity.this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setContentView(R.layout.dialog_signature);
+        dialog.setCancelable(true);
+
         String signature_title = "Supervisor Signature";
         // Creating Separate Directory for saving Generated Images
         final String DIRECTORY_SIGNATURE = Environment.getExternalStorageDirectory().getPath() + "/SystemPest-InventorySignatures/";
@@ -612,28 +667,27 @@ public class InventoryActivity extends AppCompatActivity implements View.OnClick
                 mSignature.save(view, Signature_StoredPath);
                 for(int i = 0; i < inventoryList.size(); i ++){
                     int final_quantity = 0;
-                    final_quantity = Integer.parseInt(inventoryList.get(i).getItemQuantity()) - inventoryList.get(i).getStockOutQuantity() ;
+                    final_quantity = Integer.parseInt(inventoryList.get(i).getItemQuantity()) - Integer.parseInt(inventoryList.get(i).getItemStockout()) ;
+                    Log.e("Final Quantity",inventoryList.get(i).getItemQuantity() + "");
+                    Log.e("Final Quantity",inventoryList.get(i).getItemStockout()+ "");
+                    Log.e("Final Quantity",final_quantity + "");
+                    Log.e("UNIT",inventoryList.get(i).getItemUnit());
                     updateInventory(inventoryList.get(i).getItemID(),
                             inventoryList.get(i).getItemName(),
                             inventoryList.get(i).getItemReference(),
                             String.valueOf(final_quantity), inventoryList.get(i).getItemPrice(), inventoryList.get(i).getItemUnit());
 
-                    if(i+1 == inventoryList.size()){
-                        for(int j = 0; j < inventoryList.size(); j ++) {
-                            int history_final_quantity = 0;
-                            history_final_quantity = Integer.parseInt(inventoryList.get(j).getItemQuantity()) - inventoryList.get(j).getStockOutQuantity() ;
-                            postInventoryHistory(inventoryList.get(j).getItemID(),
-                                    inventoryList.get(j).getItemName(),
-                                    inventoryList.get(j).getItemReference(), String.valueOf(inventoryList.get(j).getItemQuantity()),
-                                    String.valueOf(history_final_quantity),
-                                    String.valueOf(inventoryList.get(j).getStockOutQuantity()));
+                    postInventoryHistory(inventoryList.get(i).getItemID(),
+                            inventoryList.get(i).getItemName(),
+                            inventoryList.get(i).getItemReference(),
+                            String.valueOf(inventoryList.get(i).getItemQuantity()),
+                            String.valueOf(final_quantity),
+                            String.valueOf(inventoryList.get(i).getItemStockout()));
 
-                            if(j+1 == inventoryList.size()){
-                                db.deleteAll();
-                                loadStorage();
-                                Toast.makeText(InventoryActivity.this,"Stock History Updated...", Toast.LENGTH_SHORT).show();
-                            }
-                        }
+                    if(i+1 == inventoryList.size()){
+                        db.deleteAll();
+                        loadStorage();
+                        Toast.makeText(InventoryActivity.this,"Stock History Updated...", Toast.LENGTH_SHORT).show();
                     }
                 }
                 //new newOrderActivity.uploadSignatureFTP().execute();
@@ -653,6 +707,12 @@ public class InventoryActivity extends AppCompatActivity implements View.OnClick
     }
 
     public class uploadSupervisorSignatureFTP extends AsyncTask<String, Void, Long> {
+
+        String final_file_name;
+
+        public uploadSupervisorSignatureFTP(String filename) {
+                final_file_name = filename;
+        }
 
         protected Long doInBackground(String... FULL_PATH_TO_LOCAL_FILE) {
             {
@@ -674,24 +734,23 @@ public class InventoryActivity extends AppCompatActivity implements View.OnClick
                     reply = ftpClient.getReplyCode();
 
                     if (FTPReply.isPositiveCompletion(reply)) {
-                        System.out.println("Connected Success");
+                        //System.out.println("Connected Success");
                     } else {
-                        System.out.println("Connection Failed");
+                        //System.out.println("Connection Failed");
                         ftpClient.disconnect();
                     }
 
                     try
                     {
-                        Log.e("PROCEEDING :", "UPLOADING");
+                        //Log.e("PROCEEDING :", "UPLOADING");
 
                         ftpClient.enterLocalPassiveMode(); // important!
                         ftpClient.setFileType(ftpClient.BINARY_FILE_TYPE);
                         String path = Environment.getExternalStorageDirectory().getPath() + "/SystemPest-InventorySignatures/" + signature_name + ".png";
-
                         FileInputStream in = new FileInputStream(new File(path));
-                        boolean result = ftpClient.storeFile("/"+ final_signature_name +".png", in);
+                        boolean result = ftpClient.storeFile("/"+ final_file_name +".png", in);
                         in.close();
-                        if (result) Log.v("upload result", "succeeded");
+                        if (result) //Log.v("upload result", "succeeded");
                         ftpClient.logout();
                         ftpClient.disconnect();
                         //File file = new File(path);
@@ -745,4 +804,45 @@ public class InventoryActivity extends AppCompatActivity implements View.OnClick
         alertDialogAndroid.show();
     }
 
+    public void showDialogNoStock() {
+        alert_dialog = new AlertDialog.Builder(this);
+        alert_dialog.setCancelable(true);
+        alert_dialog.setTitle("No stock");
+        alert_dialog.setMessage("There is no stock for this item");
+        alert_dialog.setNegativeButton("OK", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                dialog.dismiss();
+            }
+        });
+        alert_dialog.show();
+    }
+
+    public void showDialog2() {
+        alert_dialog = new AlertDialog.Builder(this);
+        alert_dialog.setCancelable(true);
+        alert_dialog.setTitle("No Item Added");
+        alert_dialog.setMessage("Please add at least 1 item");
+        alert_dialog.setNegativeButton("OK", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                dialog.dismiss();
+            }
+        });
+        alert_dialog.show();
+    }
+
+    public void showDialog() {
+        alert_dialog = new AlertDialog.Builder(this);
+        alert_dialog.setCancelable(true);
+        alert_dialog.setTitle("No Quantity Added");
+        alert_dialog.setMessage("Please add at least 1 quantity for each item");
+        alert_dialog.setNegativeButton("OK", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                dialog.dismiss();
+            }
+        });
+        alert_dialog.show();
+    }
 }

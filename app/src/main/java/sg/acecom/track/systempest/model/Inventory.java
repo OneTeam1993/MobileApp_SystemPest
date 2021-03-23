@@ -16,6 +16,8 @@ public class Inventory {
     int DriverID;
     int AssetID;
     String itemUnit;
+    String itemStockout;
+
 
     public String getItemUnit() {
         return itemUnit;
@@ -29,7 +31,7 @@ public class Inventory {
 
     }
 
-    public Inventory(int db_ID, int itemID, String itemName, String itemReference, String itemQuantity, String itemPrice, String itemUnit) {
+    public Inventory(int db_ID, int itemID, String itemName, String itemReference, String itemQuantity, String itemPrice, String itemUnit,String itemStockout) {
         this.db_ID = db_ID;
         this.itemID = itemID;
         this.itemName = itemName;
@@ -37,14 +39,25 @@ public class Inventory {
         this.itemQuantity = itemQuantity;
         this.itemPrice = itemPrice;
         this.itemUnit = itemUnit;
+        this.itemStockout = itemStockout;
     }
 
-    public Inventory(int itemID, String itemName, String itemReference, String itemQuantity, String itemPrice) {
+    public Inventory(int itemID, String itemName, String itemReference, String itemQuantity, String itemPrice, String itemUnit, String itemStockout) {
         this.itemID = itemID;
         this.itemName = itemName;
         this.itemReference = itemReference;
         this.itemQuantity = itemQuantity;
         this.itemPrice = itemPrice;
+        this.itemUnit = itemUnit;
+        this.itemStockout = itemStockout;
+    }
+
+    public String getItemStockout() {
+        return itemStockout;
+    }
+
+    public void setItemStockout(String itemStockout) {
+        this.itemStockout = itemStockout;
     }
 
     public int getDb_ID() {
@@ -55,13 +68,6 @@ public class Inventory {
         this.db_ID = db_ID;
     }
 
-    public int getStockOutQuantity() {
-        return StockOutQuantity;
-    }
-
-    public void setStockOutQuantity(int stockOutQuantity) {
-        StockOutQuantity = stockOutQuantity;
-    }
 
     public int getDriverID() {
         return DriverID;

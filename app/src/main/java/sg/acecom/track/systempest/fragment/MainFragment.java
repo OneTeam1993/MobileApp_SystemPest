@@ -1,28 +1,25 @@
 package sg.acecom.track.systempest.fragment;
 
-import android.annotation.TargetApi;
 import android.app.AlertDialog;
 import android.app.Fragment;
-import android.app.NotificationManager;
-import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
-import android.support.annotation.Nullable;
-import android.support.annotation.RequiresApi;
-import android.support.design.widget.CoordinatorLayout;
-import android.support.design.widget.Snackbar;
-import android.support.v4.content.ContextCompat;
-import android.support.v7.widget.CardView;
+
+import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
+import androidx.core.content.ContextCompat;
+import androidx.cardview.widget.CardView;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.ImageView;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.android.volley.Request;
 import com.android.volley.Response;
@@ -52,7 +49,6 @@ import sg.acecom.track.systempest.util.AppConstant;
 import sg.acecom.track.systempest.util.AppController;
 import sg.acecom.track.systempest.util.IMEI;
 import sg.acecom.track.systempest.util.MyPreferences;
-import sg.acecom.track.systempest.util.SnackBarUtil;
 
 /**
  * Created by jmingl on 5/3/18.
@@ -66,6 +62,7 @@ public class MainFragment extends Fragment implements View.OnClickListener{
     CardView cvMaintenance;
     CardView cvHistory;
     TextView userName, dateToday, userCompany,numberOfJobs;
+    EditText etTechnicianName;
     Button buttonLogout;
     MyPreferences pref;
     IMEI imei;
@@ -86,6 +83,7 @@ public class MainFragment extends Fragment implements View.OnClickListener{
         cvHistory = view.findViewById(R.id.cvHistory);
         numberOfJobs = view.findViewById(R.id.numberOfJobs);
         userName = view.findViewById(R.id.userName);
+        etTechnicianName = view.findViewById(R.id.etTechnicianName);
         userCompany = view.findViewById(R.id.userCompany);
         dateToday = view.findViewById(R.id.dateToday);
         buttonLogout = view.findViewById(R.id.buttonLogout);
@@ -111,11 +109,14 @@ public class MainFragment extends Fragment implements View.OnClickListener{
                 break;
 
             case(R.id.cvJob):
+                pref.savePreferences("homeTechnicianName", etTechnicianName.getText().toString());
                 intent = new Intent(getActivity(), JobActivity.class);
                 startActivity(intent);
                 break;
 
             case(R.id.cvMaintenance):
+
+
                 intent = new Intent(getActivity(), MaintenanceActivity.class);
                 startActivity(intent);
                 break;
@@ -123,18 +124,29 @@ public class MainFragment extends Fragment implements View.OnClickListener{
             case(R.id.cvHistory):
                 intent = new Intent(getActivity(), HistoryActivity.class);
                 startActivity(intent);
-                //Snackbar.make(view, "History is under-development.", SNACKBAR_DURATION).show();
+
+
                 break;
 
             case(R.id.buttonLogout):
+                //timer.cancel();
+                //timer2.cancel();
                 logoutAlert();
                 break;
         }
     }
 
     public void initContent(){
+
         SimpleDateFormat format= new SimpleDateFormat("d MMMM, yyyy", Locale.getDefault());
         String myDate = format.format(new Date());
+
+        if(pref.checkPrefrences("homeTechnicianName")){
+            Log.e("Test : ", "TRUE");
+            etTechnicianName.setText(pref.getPreferences("homeTechnicianName",""));
+        }else{
+            etTechnicianName.setText("");
+        }
 
         userName.setText(pref.getPreferences("driver_name",""));
         userCompany.setText(pref.getPreferences("driver_company",""));
@@ -214,7 +226,7 @@ public class MainFragment extends Fragment implements View.OnClickListener{
                 if (status.getMessage().equals("OK")) {
                     try {
                         JSONObject json = new JSONObject(response);
-
+                        pref.removePreferences("homeTechnicianName");
                         Intent intent = new Intent(getActivity(), LoginActivity.class);
                         //intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
                         startActivity(intent);
@@ -231,9 +243,12 @@ public class MainFragment extends Fragment implements View.OnClickListener{
     }
 
     private String getIMEI(){
-        imei.setDeviceID();
-
-        return imei.getDeviceID();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            return pref.getPreferences("loginIMEI","");
+        } else {
+            imei.setDeviceID("");
+            return imei.getDeviceID();
+        }
     }
 
     private void getNumberOfJobs(){
@@ -281,6 +296,60 @@ public class MainFragment extends Fragment implements View.OnClickListener{
 
         // Access the RequestQueue through your singleton class.
         AppController.getInstance().addToRequestQueue(getRequest);
+    }
+
+    private void createPostInfo(){
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(Calendar.getInstance().getTime());
+        cal.add(Calendar.HOUR, -8);
+        cal.add(Calendar.MINUTE, -5);
+        Date eightHourBack = cal.getTime();
+        String timestamp = new SimpleDateFormat("MM/dd/yyyy HH:mm:ss a", Locale.ENGLISH).format(eightHourBack);
+        //Log.e("TIME : ", timestamp);
+        JSONObject params = new JSONObject();
+        try {
+            params.put("Tag", "0863835025666855");
+            params.put("FixID", 2);
+            params.put("Satellites", 7);
+            params.put("PosX", 103.907027);
+            params.put("PosY", 1.334567);
+            params.put("PosZ", 0);
+            params.put("Speed", 0.5556);
+            params.put("Course", 0);
+            params.put("HDOP", 0);
+            params.put("Ignition", 1);
+            params.put("Engine", 2);
+            params.put("Mileage", 2);
+            params.put("Battery", 29444);
+            params.put("Fuel", 0);
+            params.put("ZoneID", 0);
+            params.put("Timestamp", timestamp);
+            params.put("RxTime", timestamp);
+            params.put("Remarks", "test data");
+
+
+        } catch (JSONException e) {
+            e.printStackTrace();
+
+        }
+
+        final String url = "http://track-asia.com/tracksgwebapi/api/posinfo";
+
+        //System.out.println(url);
+
+        AQuery aq = new AQuery(getActivity());
+        aq.post(url, params, String.class, new AjaxCallback<String>() {
+            @Override
+            public void callback(String url, String response, AjaxStatus status) {
+                //System.out.println(response);
+                if (status.getMessage().equals("OK")) {
+
+                    Toast.makeText(getActivity(), response, Toast.LENGTH_SHORT).show();
+
+                }
+            }
+        }.header("Content-Type", "application/x-www-form-urlencoded")
+                .header("_method", "POST"));
     }
 
 }

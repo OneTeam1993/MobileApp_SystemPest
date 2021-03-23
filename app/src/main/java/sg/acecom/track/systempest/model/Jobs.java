@@ -30,7 +30,7 @@ public class Jobs {
     String Agent;
     String JobStatus;
     String JobUser;
-    String JobType;
+    int JobType;
     String Postal;
     String CompanyDestination;
     String JobAccepted;
@@ -51,6 +51,41 @@ public class Jobs {
     String DriverName;
     String AreaCovered;
     String ReferenceNo;
+    String Technician;
+    int FormType;
+    int MaintenanceJobID;
+
+    public int getMaintenanceJobID() {
+        return MaintenanceJobID;
+    }
+
+    public void setMaintenanceJobID(int maintenanceJobID) {
+        MaintenanceJobID = maintenanceJobID;
+    }
+
+    public int getJobType() {
+        return JobType;
+    }
+
+    public void setJobType(int jobType) {
+        JobType = jobType;
+    }
+
+    public String getTechnician() {
+        return Technician;
+    }
+
+    public void setTechnician(String technician) {
+        Technician = technician;
+    }
+
+    public int getFormType() {
+        return FormType;
+    }
+
+    public void setFormType(int formType) {
+        FormType = formType;
+    }
 
     public String getReferenceNo() {
         return ReferenceNo;
@@ -363,16 +398,6 @@ public class Jobs {
     public void setJobUser(String jobUser) {
         JobUser = jobUser;
     }
-
-    public String getJobType() {
-        return JobType;
-    }
-
-    public void setJobType(String jobType) {
-        JobType = jobType;
-    }
-
-
 
     public String getCompanyDestination() {
         return CompanyDestination;

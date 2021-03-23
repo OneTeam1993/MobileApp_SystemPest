@@ -2,8 +2,8 @@ package sg.acecom.track.systempest;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.support.annotation.Nullable;
-import android.support.v7.app.AppCompatActivity;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
 
 /**
  * Created by jmingl on 5/3/18.
@@ -20,7 +20,7 @@ public class SplashActivity extends AppCompatActivity{
     }
 
     private void initMainActivity(){
-        Intent i = new Intent(SplashActivity.this, LoginActivity.class);
+        Intent i = new Intent(SplashActivity.this, FirstTimeIMEIActivity.class);
         startActivity(i);
         // close this activity
         finish();

@@ -7,9 +7,9 @@ import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Bundle;
 import android.os.IBinder;
-import android.support.annotation.Nullable;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.LocalBroadcastManager;
+import androidx.annotation.Nullable;
+import androidx.core.app.ActivityCompat;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import android.util.Log;
 
 import com.google.android.gms.common.ConnectionResult;
@@ -61,7 +61,7 @@ public class LocationMonitoringService extends Service implements
         mLocationRequest.setFastestInterval(10);
 
 
-        int priority = LocationRequest.PRIORITY_HIGH_ACCURACY; //by default
+        int priority = LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY; //by default
         //PRIORITY_BALANCED_POWER_ACCURACY, PRIORITY_LOW_POWER, PRIORITY_NO_POWER are the other priority modes
 
 
@@ -119,7 +119,7 @@ public class LocationMonitoringService extends Service implements
 
         }
 
-        Log.d(TAG, "Connected to Google API");
+        //Log.d(TAG, "Connected to Google API");
     }
 
     /*
@@ -134,11 +134,11 @@ public class LocationMonitoringService extends Service implements
     //to get the location change
     @Override
     public void onLocationChanged(Location location) {
-        Log.d(TAG, "Location changed");
+        //Log.d(TAG, "Location changed");
 
 
         if (location != null) {
-            Log.d(TAG, "== location != null");
+            //Log.d(TAG, "== location != null");
 
             endLocation.setLatitude(location.getLatitude());
             endLocation.setLongitude(location.getLongitude());
@@ -152,7 +152,7 @@ public class LocationMonitoringService extends Service implements
 
     private void sendMessageToUI(String lat, String lng, String spd, String dir, String mil) {
 
-        Log.d(TAG, "Sending info...");
+        //Log.d(TAG, "Sending info...");
 
         Intent intent = new Intent(ACTION_LOCATION_BROADCAST);
         intent.putExtra(EXTRA_LATITUDE, lat);
@@ -175,7 +175,7 @@ public class LocationMonitoringService extends Service implements
         if (mLocationClient.isConnected()) {
             mLocationClient.disconnect();
         }
-        Log.e(TAG, "onCreate() , service stopped...");
+        //Log.e(TAG, "onCreate() , service stopped...");
     }
 
     private String getUTCDateAndTime() {

@@ -2,10 +2,10 @@ package sg.acecom.track.systempest.adapter;
 
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.content.DialogInterface;
-import android.content.Intent;
-import android.net.Uri;
-import android.support.v7.widget.RecyclerView;
+
+import androidx.recyclerview.widget.RecyclerView;
+
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -15,12 +15,7 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
-import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 
 import sg.acecom.track.systempest.InventoryActivity;
 import sg.acecom.track.systempest.R;
@@ -42,7 +37,7 @@ public class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.MyVi
     private final static int FADE_DURATION = 1000; //FADE_DURATION in milliseconds
 
     public class MyViewHolder extends RecyclerView.ViewHolder {
-        public TextView inventoryItem, itemQuantity;
+        public TextView inventoryItem, itemQuantity, inventoryUnit;
         public Button buttonRemove;
         public ImageView imageAdd, imageMinus;
 
@@ -53,6 +48,7 @@ public class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.MyVi
             buttonRemove = view.findViewById(R.id.buttonRemove);
             imageAdd = view.findViewById(R.id.imageAdd);
             imageMinus = view.findViewById(R.id.imageMinus);
+            inventoryUnit = view.findViewById(R.id.inventoryUnit);
         }
     }
 
@@ -78,19 +74,31 @@ public class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.MyVi
         // Set the view to fade in
         setFadeAnimation(holder.itemView);
         final Inventory inventory = inventoryList.get(position);
+        //inventory.setDb_ID(position + 1);
+        System.out.println("DB_ID = " + inventory.getDb_ID());
         holder.inventoryItem.setText(inventory.getItemName());
+        holder.inventoryUnit.setText(inventory.getItemUnit());
         //holder.itemQuantity.setText(String.valueOf(inventory.getItemQuantity()));
         final int[] quantity = {0};
-        inventory.setStockOutQuantity(0);
+        System.out.println("INVENTORY QTT = " + inventory.getItemQuantity());
+        System.out.println("STOCKOUT  = " + inventory.getItemStockout());
+        //inventory.setStockOutQuantity(Integer.parseInt(inventory.getItemStockout()));
+        holder.itemQuantity.setText(inventory.getItemStockout());
         holder.imageAdd.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if(quantity[0] >= Integer.parseInt(inventory.getItemQuantity())){
+                String currentQuantity = String.valueOf(holder.itemQuantity.getText());
+                if(Integer.parseInt(currentQuantity) >= Integer.parseInt(inventory.getItemQuantity())){
                     Toast.makeText(mContext, "Exceed number of quantity in Inventory", Toast.LENGTH_SHORT).show();
                 }else{
-                    quantity[0] = quantity[0] + 1;
-                    inventory.setStockOutQuantity(quantity[0]);
-                    holder.itemQuantity.setText(String.valueOf(quantity[0]));
+                    ((InventoryActivity) mContext).updateItemCount("Add");
+                    int intCurrentQuantity = Integer.parseInt(currentQuantity) + 1;
+                    System.out.println("STOCKOUT = " + intCurrentQuantity + "????");
+                    inventory.setItemStockout(String.valueOf(intCurrentQuantity));
+                    //System.out.println("add = " + inventory.getItemStockout());
+                    int isUpdate = db.updateInventory(inventory);
+                    System.out.println("ISUPDATE = " + isUpdate);
+                    holder.itemQuantity.setText(String.valueOf(intCurrentQuantity));
                 }
 
             }
@@ -98,12 +106,16 @@ public class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.MyVi
         holder.imageMinus.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if(quantity[0] <= 0){
+                String currentQuantity = String.valueOf(holder.itemQuantity.getText());
+                if(Integer.parseInt(currentQuantity) <= 0){
 
                 }else{
-                    quantity[0] = quantity[0] - 1;
-                    inventory.setStockOutQuantity(quantity[0]);
-                    holder.itemQuantity.setText(String.valueOf(quantity[0]));
+                    ((InventoryActivity) mContext).updateItemCount("Minus");
+                    int intCurrentQuantity = Integer.parseInt(currentQuantity) - 1;
+                    inventory.setItemStockout(String.valueOf(intCurrentQuantity));
+                    int isUpdate = db.updateInventory(inventory);
+                    System.out.println("ISUPDATE = " + isUpdate);
+                    holder.itemQuantity.setText(String.valueOf(intCurrentQuantity));
                 }
             }
         });
@@ -143,4 +155,5 @@ public class InventoryAdapter extends RecyclerView.Adapter<InventoryAdapter.MyVi
         inventoryList.remove(position);
         notifyItemRemoved(position);
     }
+
 }

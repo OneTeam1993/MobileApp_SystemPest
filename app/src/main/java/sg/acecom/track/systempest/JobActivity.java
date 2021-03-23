@@ -4,29 +4,16 @@ import android.app.Fragment;
 import android.app.FragmentManager;
 import android.app.FragmentTransaction;
 import android.os.Bundle;
-import android.os.Environment;
-import android.support.annotation.Nullable;
-import android.support.design.widget.Snackbar;
-import android.support.v7.app.AppCompatActivity;
+
+import androidx.annotation.Nullable;
+import com.google.android.material.snackbar.Snackbar;
+import androidx.appcompat.app.AppCompatActivity;
 import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.LinearLayout;
 
-import com.android.volley.RequestQueue;
-import com.android.volley.toolbox.Volley;
-import com.itextpdf.text.Document;
-import com.itextpdf.text.PageSize;
-import com.itextpdf.text.pdf.PdfWriter;
-
-import java.io.File;
-import java.io.FileOutputStream;
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
-import java.util.Date;
-
-import sg.acecom.track.systempest.forms.PageHeaderFooter;
-import sg.acecom.track.systempest.fragment.JobListFragment;
+import sg.acecom.track.systempest.fragment.AllJobListFragment;
 import sg.acecom.track.systempest.util.SnackBarUtil;
 
 import static sg.acecom.track.systempest.fragment.MainFragment.SNACKBAR_DURATION;
@@ -46,7 +33,7 @@ public class JobActivity extends AppCompatActivity {
         layout_linear = findViewById(R.id.layout_linear);
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         getSupportActionBar().setTitle("My Jobs");
-        loadFragment(new JobListFragment());
+        loadFragment(new AllJobListFragment());
     }
 
     private void loadFragment(Fragment fragment) {

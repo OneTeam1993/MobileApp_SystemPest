@@ -26,6 +26,16 @@ public class Maintenance {
     int MaintenanceJobID;
     String AreaCovered;
     String ReferenceNo;
+    String Pest;
+    String Technician;
+
+    public String getTechnician() {
+        return Technician;
+    }
+
+    public void setTechnician(String technician) {
+        Technician = technician;
+    }
 
     public String getReferenceNo() {
         return ReferenceNo;

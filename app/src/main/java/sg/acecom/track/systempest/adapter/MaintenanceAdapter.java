@@ -3,7 +3,7 @@ package sg.acecom.track.systempest.adapter;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
-import android.support.v7.widget.RecyclerView;
+import androidx.recyclerview.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -36,7 +36,7 @@ public class MaintenanceAdapter extends RecyclerView.Adapter<MaintenanceAdapter.
     private final static int FADE_DURATION = 100; //FADE_DURATION in milliseconds
 
     public class MyViewHolder extends RecyclerView.ViewHolder {
-        public TextView jobAddress, jobCustomer, jobSite, jobNextMaintenance;
+        public TextView jobAddress, jobCustomer, jobSite, jobNextMaintenance, jobTechnician;
         public Button buttonView;
         public View jobView;
 
@@ -48,6 +48,7 @@ public class MaintenanceAdapter extends RecyclerView.Adapter<MaintenanceAdapter.
             jobCustomer = view.findViewById(R.id.jobCustomer);
             jobNextMaintenance = view.findViewById(R.id.jobNextMaintenance);
             buttonView = view.findViewById(R.id.buttonView);
+            jobTechnician = view.findViewById(R.id.jobTechnician);
         }
     }
 
@@ -104,6 +105,7 @@ public class MaintenanceAdapter extends RecyclerView.Adapter<MaintenanceAdapter.
         holder.jobAddress.setText(maintenance.getUnit() + ", " + maintenance.getAddress() + ", " + maintenance.getPostal());
         holder.jobCustomer.setText(maintenance.getPIC());
         holder.jobNextMaintenance.setText(convertDate(maintenance.getNextJobDate()));
+        holder.jobTechnician.setText(maintenance.getTechnician());
 
 
         holder.buttonView.setOnClickListener(new View.OnClickListener() {
@@ -130,10 +132,12 @@ public class MaintenanceAdapter extends RecyclerView.Adapter<MaintenanceAdapter.
                 pref.savePreferences("maintenance_jobID", String.valueOf(maintenance.getMaintenanceJobID()));
                 pref.savePreferences("maintenance_AreaCovered", String.valueOf(maintenance.getAreaCovered()));
                 pref.savePreferences("maintenance_jobReferenceNo", String.valueOf(maintenance.getReferenceNo()));
+                pref.savePreferences("maintenance_jobTechnician", String.valueOf(maintenance.getTechnician()));
 
 
                 Intent intent = new Intent(mContext, MaintenanceDetailActivity.class);
                 mContext.startActivity(intent);
+                mContext.finish();
             }
         });
 

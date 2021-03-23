@@ -1,29 +1,22 @@
 package sg.acecom.track.systempest.fragment;
 
-import android.app.AlertDialog;
 import android.app.Fragment;
 import android.os.Bundle;
 import android.os.Handler;
-import android.support.v4.widget.SwipeRefreshLayout;
-import android.support.v7.widget.CardView;
-import android.support.v7.widget.DefaultItemAnimator;
-import android.support.v7.widget.LinearLayoutManager;
-import android.support.v7.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+import androidx.recyclerview.widget.DefaultItemAnimator;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.ProgressBar;
-import android.widget.TextView;
 
 import com.android.volley.Request;
-import com.android.volley.RequestQueue;
 import com.android.volley.Response;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonArrayRequest;
-import com.android.volley.toolbox.JsonObjectRequest;
-import com.android.volley.toolbox.Volley;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -41,7 +34,6 @@ import sg.acecom.track.systempest.adapter.JobAdapter;
 import sg.acecom.track.systempest.model.Jobs;
 import sg.acecom.track.systempest.util.AppConstant;
 import sg.acecom.track.systempest.util.AppController;
-import sg.acecom.track.systempest.util.IMEI;
 import sg.acecom.track.systempest.util.MyPreferences;
 
 /**
@@ -201,9 +193,14 @@ public class JobListFragment extends Fragment implements SwipeRefreshLayout.OnRe
                                         job.setJobCompleted(obj.getString("JobCompleted"));
 
                                         job.setReceipt(obj.getString("Receipt"));
-                                        job.setImage(obj.getString("Image"));
-                                        job.setImageFill(obj.getString("ImageFill"));
+                                        //job.setImage(obj.getString("Image"));
+                                        //job.setImageFill(obj.getString("ImageFill"));
                                         job.setReferenceNo(obj.getString("ReferenceNo"));
+                                        //job.setTechnician(obj.getString("Technician"));
+
+                                        job.setTechnician(obj.getString(pref.getPreferences("homeTechnicianName","")));
+
+                                        job.setFormType(obj.getInt("FormType"));
 
                                         JSONArray arrayPest = obj.getJSONArray("Pest");
                                         StringBuilder pestBuilder = new StringBuilder();

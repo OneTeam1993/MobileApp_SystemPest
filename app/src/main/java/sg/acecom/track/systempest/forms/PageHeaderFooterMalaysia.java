@@ -107,7 +107,8 @@ public class PageHeaderFooterMalaysia extends PdfPageEventHelper {
     }
 
     private void addHeader(PdfWriter writer, Document document){
-        PdfPTable header = new PdfPTable(1);
+        float[] columnWidths = {1, 3, 1};
+        PdfPTable header = new PdfPTable(columnWidths);
         Drawable d;
         Bitmap bitmap;
         ByteArrayOutputStream stream;
@@ -117,6 +118,11 @@ public class PageHeaderFooterMalaysia extends PdfPageEventHelper {
         try {
             header.setTotalWidth(document.right() - document.left());
             header.getDefaultCell().setBorderWidth(0f);
+
+            cell = new PdfPCell(new Phrase(" ", FontFactory.getFont(FontFactory.HELVETICA,8, Font.ITALIC)));
+            cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+            cell.setBorder(Rectangle.NO_BORDER);
+            header.addCell(cell);
 
             d = context.getResources().getDrawable (R.drawable.formmy_systempestlogo);
             bitmap = ((BitmapDrawable)d).getBitmap();
@@ -131,12 +137,37 @@ public class PageHeaderFooterMalaysia extends PdfPageEventHelper {
             cell.setBorder(Rectangle.NO_BORDER);
             header.addCell(cell);
 
+            cell = new PdfPCell(new Phrase("SPC-QMS-01-F06", FontFactory.getFont(FontFactory.HELVETICA,8, Font.NORMAL)));
+            cell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+            cell.setBorder(Rectangle.NO_BORDER);
+            header.addCell(cell);
+
+            cell = new PdfPCell(new Phrase(" ", FontFactory.getFont(FontFactory.HELVETICA,8, Font.ITALIC)));
+            cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+            cell.setBorder(Rectangle.NO_BORDER);
+            header.addCell(cell);
+
             cell = new PdfPCell(new Phrase("Website: www.systempest.com  GST No: 000506593280", FontFactory.getFont(FontFactory.HELVETICA,8, Font.ITALIC)));
             cell.setHorizontalAlignment(Element.ALIGN_CENTER);
             cell.setBorder(Rectangle.NO_BORDER);
             header.addCell(cell);
 
+            cell = new PdfPCell(new Phrase(" ", FontFactory.getFont(FontFactory.HELVETICA,8, Font.ITALIC)));
+            cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+            cell.setBorder(Rectangle.NO_BORDER);
+            header.addCell(cell);
+
+            cell = new PdfPCell(new Phrase(" ", FontFactory.getFont(FontFactory.HELVETICA,8, Font.ITALIC)));
+            cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+            cell.setBorder(Rectangle.NO_BORDER);
+            header.addCell(cell);
+
             cell = new PdfPCell(new Phrase("PEST CONTROL SERVICE REPORT", FontFactory.getFont(FontFactory.HELVETICA,8, Font.BOLD)));
+            cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+            cell.setBorder(Rectangle.NO_BORDER);
+            header.addCell(cell);
+
+            cell = new PdfPCell(new Phrase(" ", FontFactory.getFont(FontFactory.HELVETICA,8, Font.ITALIC)));
             cell.setHorizontalAlignment(Element.ALIGN_CENTER);
             cell.setBorder(Rectangle.NO_BORDER);
             header.addCell(cell);

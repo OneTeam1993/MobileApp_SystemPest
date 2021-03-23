@@ -3,10 +3,10 @@ package sg.acecom.track.systempest.fragment;
 import android.app.Fragment;
 import android.os.Bundle;
 import android.os.Handler;
-import android.support.v4.widget.SwipeRefreshLayout;
-import android.support.v7.widget.DefaultItemAnimator;
-import android.support.v7.widget.LinearLayoutManager;
-import android.support.v7.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+import androidx.recyclerview.widget.DefaultItemAnimator;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -21,18 +21,11 @@ import com.android.volley.toolbox.JsonArrayRequest;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.net.URLEncoder;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 
 import sg.acecom.track.systempest.R;
-import sg.acecom.track.systempest.adapter.JobAdapter;
 import sg.acecom.track.systempest.adapter.MaintenanceAdapter;
-import sg.acecom.track.systempest.model.Jobs;
 import sg.acecom.track.systempest.model.Maintenance;
 import sg.acecom.track.systempest.util.AppConstant;
 import sg.acecom.track.systempest.util.AppController;
@@ -147,6 +140,7 @@ public class MaintenanceFragment extends Fragment implements SwipeRefreshLayout.
                         maintenanceList.clear();
                         swipeContainer.setRefreshing(true);
                         try{
+                            Log.e("Maintenance Response", String.valueOf(response));
                             for (int i = 0; i < response.length(); i++) {
                                 JSONObject obj = response.getJSONObject(i);
                                 Maintenance maintenance = new Maintenance();
@@ -172,12 +166,15 @@ public class MaintenanceFragment extends Fragment implements SwipeRefreshLayout.
                                 maintenance.setNextJobDate(maintenanceJob.getString("Timestamp"));
                                 maintenance.setMaintenanceJobID(maintenanceJob.getInt("MaintenanceJobID"));
                                 maintenance.setReferenceNo(maintenanceJob.getString("ReferenceNo"));
+                                maintenance.setTechnician(maintenanceJob.getString("Technician"));
 
-                                JSONObject objectAc = obj.getJSONObject("AcInfo");
-                                maintenance.setAreaCovered(objectAc.getString("GeneralLocation"));
+                                //JSONObject objectAc = obj.getJSONObject("AcInfo");
+                                //maintenance.setAreaCovered(objectAc.getString("GeneralLocation"));
 
                                 if(maintenanceJob.getInt("Flag") != 0){
-                                    maintenanceList.add(maintenance);
+                                    if(maintenanceJob.getInt("DriverID") == Integer.parseInt(pref.getPreferences("driver_id",""))){
+                                        maintenanceList.add(maintenance);
+                                    }
                                 }
                             }
 

@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
 import android.app.Dialog;
+import android.app.ProgressDialog;
 import android.app.TimePickerDialog;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -18,18 +19,24 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.drawable.Drawable;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.StrictMode;
 import android.provider.MediaStore;
-import android.support.annotation.Nullable;
-import android.support.design.widget.FloatingActionButton;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.DefaultItemAnimator;
-import android.support.v7.widget.LinearLayoutManager;
-import android.support.v7.widget.RecyclerView;
+import androidx.annotation.Nullable;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.DefaultItemAnimator;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+import android.text.Editable;
 import android.text.InputType;
+import android.text.TextWatcher;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.MenuItem;
@@ -39,6 +46,7 @@ import android.view.ViewGroup;
 import android.view.Window;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
+import android.widget.CompoundButton;
 import android.widget.DatePicker;
 import android.widget.EditText;
 import android.widget.ImageView;
@@ -84,6 +92,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.text.ParseException;
@@ -100,7 +109,7 @@ import javax.mail.MessagingException;
 
 import sg.acecom.track.systempest.adapter.AocAdapter;
 import sg.acecom.track.systempest.adapter.FindingsAdapter;
-import sg.acecom.track.systempest.adapter.ImageAdapter;
+import sg.acecom.track.systempest.adapter.MaintenanceImageAdapter;
 import sg.acecom.track.systempest.adapter.PestAdapter;
 import sg.acecom.track.systempest.adapter.RecommendationsAdapter;
 import sg.acecom.track.systempest.forms.PageHeaderFooter;
@@ -133,18 +142,40 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
     String maintenancejob_FlagValue;
     String maintenancejob_JobCancelled;
     String maintenancejob_CancelRemarks;
+    String maintenancejob_ReferenceNo;
     int maintenancejob_isSent;
+
+    int update_MaintenanceID;
+    String update_Timestamp;
+    String update_RxTime;
+    String update_Address;
+    String update_Postal;
+    String update_Unit;
+    String update_CusCompany;
+    String update_PIC;
+    String update_Phone;
+    String update_Email;
+    String update_Site;
+    String update_ContractStart;
+    String update_ContractEnd;
+    String update_MaintenanceInterval;
+    String update_NotificationInterval;
+    String update_Remarks;
+    int update_CompanyID;
+    int update_UserID;
 
     private TextView jobReference;
     private TextView cusName;
-    private TextView cusEmail;
+    private EditText cusEmail;
     private TextView jobDateTime;
     private TextView jobAreaCovered;
     private TextView jobDestination;
     private TextView jobPest;
+    private TextView jobTechnician;
     private TextView jobAmount;
     private Button buttonReschedule;
     private EditText jobNewAmount;
+    private TextView jobAdminRemarks;
     private Button buttonCalender;
     private RecyclerView recyclerTreatment;
     private RecyclerView recyclerAreaConcerned;
@@ -159,12 +190,15 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
     private RadioGroup radioPayment;
     private RadioButton radioCash;
     private RadioButton radioCheque;
+    private RadioButton radioIB;
+    private RadioButton radioNone;
     private Button buttonBack;
     private Button buttonRoute;
     private Button buttonDone;
+    private LinearLayout ll_amount;
     Calendar date;
 
-    private ImageAdapter img_adapter;
+    private MaintenanceImageAdapter img_adapter;
     private List<Images> imagesList;
     private PestAdapter pestAdapter;
     private List<Pests> pestsList;
@@ -180,6 +214,8 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
     final ArrayList<String> recList = new ArrayList();
     final ArrayList<String> selectedAoc = new ArrayList();
     final ArrayList<String> selectedRec = new ArrayList();
+
+    ProgressDialog nDialog;
 
     MyPreferences pref;
     // Activity request codes
@@ -228,23 +264,14 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
 
     AlertDialog.Builder alert_dialog;
 
+    ProgressDialog pDialog;
+
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.layout_detail);
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         pref = new MyPreferences(this);
-        // Dialog Function
-        dialog = new Dialog(MaintenanceDetailActivity.this);
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        dialog.setContentView(R.layout.dialog_signature);
-        dialog.setCancelable(true);
-
-        // Dialog Function
-        dialog_tech = new Dialog(MaintenanceDetailActivity.this);
-        dialog_tech.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        dialog_tech.setContentView(R.layout.dialog_signature);
-        dialog_tech.setCancelable(true);
 
         jobReference = findViewById( R.id.jobReference );
         cusName = findViewById( R.id.cusName );
@@ -253,7 +280,9 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
         jobAreaCovered = findViewById( R.id.jobAreaCovered );
         jobDestination = findViewById( R.id.jobDestination );
         jobPest = findViewById( R.id.jobPest );
+        jobTechnician = findViewById( R.id.jobTechnician );
         jobAmount = findViewById( R.id.jobAmount );
+        jobAdminRemarks = findViewById( R.id.jobAdminRemarks );
         jobNewAmount = findViewById( R.id.jobNewAmount );
         buttonCalender = findViewById( R.id.buttonCalender );
         buttonReschedule = findViewById( R.id.buttonReschedule );
@@ -270,12 +299,15 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
         radioPayment = findViewById( R.id.radioPayment );
         radioCash = findViewById( R.id.radioCash );
         radioCheque = findViewById( R.id.radioCheque );
+        radioIB = findViewById( R.id.radioIB );
+        radioNone = findViewById( R.id.radioNone );
         buttonBack = findViewById( R.id.buttonBack );
         buttonRoute = findViewById( R.id.buttonRoute );
         buttonDone = findViewById( R.id.buttonDone );
+        ll_amount = findViewById( R.id.ll_amount );
 
         imagesList = new ArrayList<>();
-        img_adapter = new ImageAdapter(this, imagesList);
+        img_adapter = new MaintenanceImageAdapter(this, imagesList);
         recyclerImages.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
         recyclerImages.setItemAnimator(new DefaultItemAnimator());
         recyclerImages.setAdapter(img_adapter);
@@ -314,6 +346,50 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
         buttonDone.setOnClickListener( this );
         buttonReschedule.setOnClickListener( this );
 
+        radioNone.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                if(isChecked){
+                    radioCheque.setChecked(false);
+                    radioIB.setChecked(false);
+                    radioCash.setChecked(false);
+                }
+            }
+        });
+
+        radioCash.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                if(isChecked){
+                    radioCheque.setChecked(false);
+                    radioIB.setChecked(false);
+                    radioNone.setChecked(false);
+                }
+            }
+        });
+
+        radioCheque.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                if(isChecked){
+                    radioCash.setChecked(false);
+                    radioIB.setChecked(false);
+                    radioNone.setChecked(false);
+                }
+            }
+        });
+
+        radioIB.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                if(isChecked){
+                    radioCash.setChecked(false);
+                    radioCheque.setChecked(false);
+                    radioNone.setChecked(false);
+                }
+            }
+        });
+
         initContent();
 
         // Checking camera availability
@@ -331,6 +407,7 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
         super.onResume();
         loadImages();
         loadMaintenanceJob();
+        loadMaintenance();
         //loadPestList();
         loadPestInformation();
         loadAOC();
@@ -339,7 +416,7 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
 
     private void loadMaintenanceJob(){
         final String url = AppConstant.endpoint_url + "maintenancejobinfo/" + pref.getPreferences("maintenance_jobID","");
-        Log.e("MaintennceJob URL : ", url);
+        //Log.e("MaintennceJob URL : ", url);
         // prepare the Request
         JsonObjectRequest getRequest = new JsonObjectRequest(Request.Method.GET, url, null,
                 new Response.Listener<JSONObject>()
@@ -358,6 +435,7 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
                             maintenancejob_JobCancelled = response.getString("JobCancelled");
                             maintenancejob_CancelRemarks = response.getString("CancelRemarks");
                             maintenancejob_isSent = response.getInt("isSent");
+                            maintenancejob_ReferenceNo = response.getString("ReferenceNo");
                             //JSONObject obj = response.getJSONObject(0);
 
                             //Log.e("Response : ", response.getString(""MaintenanceJobID));
@@ -388,8 +466,10 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
 
     @Override
     public void onBackPressed() {
-        super.onBackPressed();
-        removePreferences();
+        //super.onBackPressed();
+        backDialog("Alert", "Are you sure you want to exit the job?");
+
+        //removePreferences();
     }
 
     @Override
@@ -405,7 +485,8 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
                 break;
 
             case(R.id.fabFindings):
-                PestDialog();
+                PestHeaderDialog();
+                //PestDialog();
                 break;
 
             case(R.id.fabCamera):
@@ -469,7 +550,7 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
                 SimpleDateFormat format = new SimpleDateFormat("dd MMM yyyy",Locale.ENGLISH);
                 String strDate = format.format(date.getTime());
                 SimpleDateFormat formatTime = new SimpleDateFormat("dd-MMM-yyyy 00:00:00",Locale.ENGLISH);
-                Log.e("Date seelcted", formatTime.format(date.getTime()));
+                //Log.e("Date seelcted", formatTime.format(date.getTime()));
             }
         }, currentDate.get(Calendar.YEAR), currentDate.get(Calendar.MONTH), currentDate.get(Calendar.DATE));
 
@@ -489,11 +570,17 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
     }
 
     private void captureImage() {
-        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-        fileUri = getOutputMediaFileUri(MEDIA_TYPE_IMAGE);
-        intent.putExtra(MediaStore.EXTRA_OUTPUT, fileUri);
-        // start the image capture Intent
-        startActivityForResult(intent, CAMERA_CAPTURE_IMAGE_REQUEST_CODE);
+        try{
+            StrictMode.VmPolicy.Builder builder = new StrictMode.VmPolicy.Builder();
+            StrictMode.setVmPolicy(builder.build());
+            Intent intent = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
+            fileUri = getOutputMediaFileUri(MEDIA_TYPE_IMAGE);
+            intent.putExtra(MediaStore.EXTRA_OUTPUT, fileUri);
+            // start the image capture Intent
+            startActivityForResult(intent, CAMERA_CAPTURE_IMAGE_REQUEST_CODE);
+        }catch(Exception e){
+            Log.e("Exception IMage : ", String.valueOf(e));
+        }
     }
 
     /*
@@ -552,6 +639,9 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
         Button buttonDelete = (Button) dialog.findViewById(R.id.buttonDelete);
         Button buttonClose = (Button) dialog.findViewById(R.id.buttonClose);
         final Spinner spinnerPest = dialog.findViewById(R.id.spinnerPest);
+        final EditText imageText = dialog.findViewById(R.id.imageText);
+        final TextView imageDisplayText = dialog.findViewById(R.id.imageDisplayText);
+        final LinearLayout layoutImage = dialog.findViewById(R.id.layoutImage);
 
        /* ArrayAdapter<String> adapter = new ArrayAdapter<String>(JobsDetailActivity.this,
                 android.R.layout.simple_spinner_item, singlePestList);
@@ -560,10 +650,20 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
 
         Glide.with(activity).load(imageUrl).into(jobImages);
 
-        buttonDelete.setOnClickListener(new View.OnClickListener() {
+        imageText.addTextChangedListener(new TextWatcher() {
             @Override
-            public void onClick(View v) {
-                //Bitmap bitmap = MediaStore.Images.Media.getBitmap(this.getContentResolver(), imageUrl);
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                imageDisplayText.setText(imageText.getText().toString().toUpperCase());
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+
             }
         });
 
@@ -575,6 +675,11 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
                 image.setTitle(spinnerPest.getSelectedItem().toString());
                 image.setImage(imageUrl);
                 imageList.add(image);*/
+
+                SaveImage(setViewToBitmapImage(layoutImage));
+
+                loadImages();
+
                 dialog.dismiss();
             }
         });
@@ -582,6 +687,50 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
         dialog.show();
 
     }
+
+    public static Bitmap setViewToBitmapImage(View view) {
+        //Define a bitmap with the same size as the view
+        Bitmap returnedBitmap = Bitmap.createBitmap(view.getWidth(), view.getHeight(), Bitmap.Config.ARGB_8888);
+        //Bind a canvas to it
+        Canvas canvas = new Canvas(returnedBitmap);
+        //Get the view's background
+        Drawable bgDrawable = view.getBackground();
+        if (bgDrawable != null)
+            //has background drawable, then draw it on the canvas
+            bgDrawable.draw(canvas);
+        else
+            //does not have background drawable, then draw white background on the canvas
+            canvas.drawColor(Color.WHITE);
+        // draw the view on the canvas
+        view.draw(canvas);
+        //return the bitmap
+        return returnedBitmap;
+    }
+
+    public static void SaveImage(Bitmap finalBitmap) {
+        String root = Environment.getExternalStorageDirectory().toString();
+        File myDir = new File(root + "/saved_main_pests");
+        if (!myDir.exists()) {
+            myDir.mkdir();
+        }
+        Random generator = new Random();
+        int n = 10000;
+        n = generator.nextInt(n);
+        String fname = "Image-" + n + ".jpg";
+        File file = new File(myDir, fname);
+        if (file.exists()) file.delete();
+        try {
+            FileOutputStream out = new FileOutputStream(file);
+            finalBitmap.compress(Bitmap.CompressFormat.JPEG, 90, out);
+            out.flush();
+            out.close();
+
+        } catch (Exception e) {
+            Log.e("Error SaveImage ", String.valueOf(e));
+            e.printStackTrace();
+        }
+    }
+
 
     public Bitmap drawTextToBitmap(Context mContext, String photoPath, String mText) {
         try {
@@ -680,9 +829,10 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
     }
 
     public void loadImages(){
-        File img_Path = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
-                .getPath() + "/" + IMAGE_DIRECTORY_NAME);
-
+        /*File img_Path = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
+                .getPath() + "/" + IMAGE_DIRECTORY_NAME);*/
+        String root = Environment.getExternalStorageDirectory().toString();
+        File img_Path = new File(root + "/saved_main_pests");
         if(img_Path.exists()){
             String[] fileNames = img_Path.list();
             int imageCount = img_Path.listFiles().length;
@@ -711,15 +861,23 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
                         try{
                             pestsList.clear();
                             singlePestList.clear();
+                            StringBuilder pestBuilder = new StringBuilder();
                             JSONArray pestArray = new JSONArray(response.getString("Pest"));
                             for(int i = 0; i < pestArray.length(); i++){
                                 JSONObject pestInfo = pestArray.getJSONObject(i);
                                 singlePestList.add(pestInfo.getString("PestDesc"));
+                                if(pestArray.length() == 1 || i + 1 == pestArray.length()){
+                                    pestBuilder.append(pestInfo.getString("PestDesc"));
+                                }else{
+                                    pestBuilder.append(pestInfo.getString("PestDesc"));
+                                    pestBuilder.append(", ");
+                                }
                                 pestsList.add(new Pests(pestInfo.getInt("ItemNo"), pestInfo.getString("PestDesc"), pestInfo.getString("TreatmentDesc")));
                                 pestAdapter.notifyDataSetChanged();
                             }
                             //response.getString()
 
+                            jobPest.setText(pestBuilder.toString());
 
                             // adapter.notifyDataSetChanged();
                         }catch(Exception e){
@@ -793,13 +951,18 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
                     public void onResponse(JSONArray response) {
                         // display response
                         recList.clear();
+                        recFinalList.clear();
                         //recommendationsList.clear();
                         try{
                             for (int i = 0; i < response.length(); i++) {
+                                Recommendations rec = new Recommendations();
                                 JSONObject recObj = response.getJSONObject(i);
                                 recList.add(recObj.getString("Recommendation"));
+                                rec.setRecommendationDesc(recObj.getString("Recommendation"));
+                                recFinalList.add(rec);
                                 //recommendationsList.add(new Recommendations(recObj.getInt("RecommendationsID"), recObj.getString("Recommendation")));
                             }
+                            recommendationsAdapter.notifyDataSetChanged();
 
                         }catch(Exception e){
                             Log.e("Response Exception :", String.valueOf(e));
@@ -823,7 +986,7 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
     }
 
     private void initContent(){
-        Calendar cal = Calendar.getInstance();
+        /*Calendar cal = Calendar.getInstance();
         cal.setTime(Calendar.getInstance().getTime());
         //Change Timestamp Timezone
         Date device_date = cal.getTime();
@@ -848,22 +1011,38 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
             buttonDone.setVisibility(View.VISIBLE);
         }else{
             buttonDone.setVisibility(View.GONE);
+        }*/
+        String destinationAddress;
+        if(pref.getPreferences("maintenance_Unit","").equals("")){
+            destinationAddress = pref.getPreferences("maintenance_Destination","") + ", " +
+                    pref.getPreferences("maintenance_Postal","");
+        }else{
+            destinationAddress = pref.getPreferences("maintenance_Unit","") + ", " +
+                    pref.getPreferences("maintenance_Destination","") + ", " +
+                    pref.getPreferences("maintenance_Postal","");
         }
 
-        String destinationAddress = pref.getPreferences("maintenance_Unit","") + ", " +
-                pref.getPreferences("maintenance_Destination","") + ", " +
-                pref.getPreferences("maintenance_Postal","");
+
 
         cusName.setText(pref.getPreferences("maintenance_PIC",""));
-        cusEmail.setText(pref.getPreferences("maintenance_Email",""));
+        if(pref.getPreferences("maintenance_Email","").equals("")){
+            cusEmail.setInputType(InputType.TYPE_CLASS_TEXT);
+        }else{
+            cusEmail.setText(pref.getPreferences("maintenance_Email",""));
+            cusEmail.setInputType(0);
+        }
         jobDateTime.setText(pref.getPreferences("maintenance_NextJobDate",""));
         jobDestination.setText(destinationAddress);
         jobAmount.setText(pref.getPreferences("maintenance_Amount",""));
-        jobPest.setText(pref.getPreferences("maintenance_jobPest",""));
-        jobAreaCovered.setText(pref.getPreferences("maintenance_AreaCovered",""));
-        jobReference.setText(pref.getPreferences("maintenance_jobReferenceNo",""));
+        jobAreaCovered.setText(pref.getPreferences("maintenance_Site",""));
+        jobReference.setText(pref.getPreferences("maintenance_ReferenceNo",""));
+        jobTechnician.setText(pref.getPreferences("maintenance_jobTechnician",""));
+        jobAdminRemarks.setText(pref.getPreferences("maintenance_Remarks",""));
+        jobReference.setText(pref.getPreferences("maintenance_ReferenceNo",""));
 
         buttonReschedule.setVisibility(View.GONE);
+        fabRecommendations.setVisibility(View.GONE);
+        ll_amount.setVisibility(View.GONE);
 
         loadPestInformation();
 
@@ -892,6 +1071,9 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
 
     private void generatePDF()
     {
+
+        showDialog();
+
         try{
             File directory = new File(Environment.getExternalStorageDirectory().getPath() + "/SystemPest-MaintenanceService");
             //String bpPath = Environment.getExternalStorageDirectory().getPath() + "/Calpeda-Project/" + pref.getPreferences("ProjectID","");
@@ -926,7 +1108,7 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
             Document document;
 
             if(pref.getPreferences("maintenance_CompanyID","").equals("1")){
-                document = new Document(PageSize.A4, 36, 36, 130, 150);
+                document = new Document(PageSize.A4, 36, 36, 130, 180);
                 pdfWriter = PdfWriter.getInstance(document, new FileOutputStream(pdfFile));
                 //PageFooter is an inner class of this class which is responsible to create Header and Footer
                 PageHeaderFooter event = new PageHeaderFooter(this, "SystemPest Service Order", clientPath, techPath, Integer.parseInt(pref.getPreferences("maintenance_CompanyID","")));
@@ -939,7 +1121,7 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
                 PageHeaderFooterMalaysia event = new PageHeaderFooterMalaysia(this, "SystemPest Malaysia Service Order", clientPath, techPath);
                 pdfWriter.setPageEvent(event);
             }else if(pref.getPreferences("maintenance_CompanyID","").equals("3")){
-                document = new Document(PageSize.A4, 36, 36, 130, 150);
+                document = new Document(PageSize.A4, 36, 36, 130, 180);
                 pdfWriter = PdfWriter.getInstance(document, new FileOutputStream(pdfFile));
                 //PageFooter is an inner class of this class which is responsible to create Header and Footer
                 PageHeaderFooter event = new PageHeaderFooter(this, "Asia White Ant Service Order", clientPath, techPath, Integer.parseInt(pref.getPreferences("maintenance_CompanyID","")));
@@ -967,13 +1149,19 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
 
             //Closing the document
             document.close();
-            new MaintenanceDetailActivity.uploadServiceForms().execute();
-            sendEmail(mPath);
 
-            Log.e("PDF ", "Created...");
+            File job_pdf = new File(mPath);
+            if(job_pdf.exists()){
+                new MaintenanceDetailActivity.uploadClientSignatures().execute();
+            }else{
+                connectionFailedDialog("PDF generated not found.", "Please try again.");
+            }
+
+
+            //Log.e("PDF ", "Created...");
         } catch (Exception e) {
             e.printStackTrace();
-            Log.e("PDF ", String.valueOf(e));
+            //Log.e("PDF ", String.valueOf(e));
 
         }
     }
@@ -1014,23 +1202,25 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
 
 
         createJobHeader(reportBody);
-        addEmptyLine(reportBody, 2);
 
         try{
+            createAreaConcerned(reportBody, 1);
+            addEmptyLine(reportBody, 1);
             for(int i = 0; i < pestsList.size(); i ++){
                 createInnerContents(reportBody, i);
-                addEmptyLine(reportBody, 1);
+                //addEmptyLine(reportBody, 1);
             }
         }catch(Exception e){
             Log.e("Error :", String.valueOf(e));
         }
 
         //document.newPage();
+        createImages(reportBody);
         createRemarks(reportBody);
 
         addEmptyLine(reportBody, 1);
 
-        createSignatureArea(reportBody);
+        //createSignatureArea(reportBody);
 
 
         // now add all this to the document
@@ -1046,66 +1236,82 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
     private void createJobHeader(Paragraph reportBody)
             throws BadElementException {
 
-        float[] columnWidths = {1,2,2,1,1}; //total 5 columns and their width. The first three columns will take the same width and the fourth one will be 5/2.
+        float[] columnWidths = {2,2,1,2,1}; //total 5 columns and their width. The first three columns will take the same width and the fourth one will be 5/2.
         PdfPTable table = new PdfPTable(columnWidths);
 
         table.setWidthPercentage(100); //set table with 100% (full page)
         table.getDefaultCell().setUseAscender(true);
 
         //First Line
-        PdfPCell cell = new PdfPCell(new Phrase("SERVICE ADDRESS   : ", FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        PdfPCell cell = new PdfPCell(new Phrase("SERVICE ADDRESS   : ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         cell.setHorizontalAlignment(Element.ALIGN_RIGHT); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         //cell.setFixedHeight(30); //cell height
         table.addCell(cell);
 
-        cell = new PdfPCell(new Phrase(pref.getPreferences("Destination",""), FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        String fullAddress = "";
+        String unitNo = pref.getPreferences("maintenance_Unit","");
+        if(unitNo == ""){
+            fullAddress = unitNo + " " + jobDestination.getText().toString();
+        }else{
+            fullAddress = jobDestination.getText().toString();
+        }
+
+
+        cell = new PdfPCell(new Phrase(jobDestination.getText().toString().toUpperCase(), FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         //cell.setHorizontalAlignment(Element.ALIGN_CENTER); //alignment
-        cell.setBorder(Rectangle.BOTTOM);
+        cell.setBorder(Rectangle.NO_BORDER);
         cell.setColspan(2);
         //cell.setFixedHeight(30); //cell height
         table.addCell(cell);
 
-        cell = new PdfPCell(new Phrase("REPORT NO   : ", FontFactory.getFont(FontFactory.HELVETICA,4, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        //REPORT NO
+        cell = new PdfPCell(new Phrase("REPORT NO   : ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         cell.setHorizontalAlignment(Element.ALIGN_RIGHT); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         //cell.setFixedHeight(10); //cell height
         table.addCell(cell);
 
-        cell = new PdfPCell(new Phrase(pref.getPreferences("JobNumber",""), FontFactory.getFont(FontFactory.HELVETICA,4, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase( pref.getPreferences("maintenance_jobID",""), FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         //cell.setHorizontalAlignment(Element.ALIGN_CENTER); //alignment
-        cell.setBorder(Rectangle.BOTTOM);
+        cell.setBorder(Rectangle.NO_BORDER);
         //cell.setFixedHeight(10); //cell height
         table.addCell(cell);
 
         //Second Line
-        cell = new PdfPCell(new Phrase("AREA COVERED   : ", FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        /*cell = new PdfPCell(new Phrase("AREA COVERED   : ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell.setHorizontalAlignment(Element.ALIGN_RIGHT); //alignment
+        cell.setBorder(Rectangle.NO_BORDER);
+        //cell.setFixedHeight(30); //cell height
+        table.addCell(cell);*/
+
+        cell = new PdfPCell(new Phrase("                ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         cell.setHorizontalAlignment(Element.ALIGN_RIGHT); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         //cell.setFixedHeight(30); //cell height
         table.addCell(cell);
 
-        cell = new PdfPCell(new Phrase("Toilet, and So on", FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase(pref.getPreferences("maintenance_Site","").toUpperCase(), FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         //cell.setHorizontalAlignment(Element.ALIGN_CENTER); //alignment
-        cell.setBorder(Rectangle.BOTTOM);
+        cell.setBorder(Rectangle.NO_BORDER);
         cell.setColspan(2);
         //cell.setFixedHeight(30); //cell height
         table.addCell(cell);
 
-        cell = new PdfPCell(new Phrase("AGREEMENT NO   : ", FontFactory.getFont(FontFactory.HELVETICA,4, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase("REFERENCE NO   : ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         cell.setHorizontalAlignment(Element.ALIGN_RIGHT); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         //cell.setFixedHeight(10); //cell height
         table.addCell(cell);
 
-        cell = new PdfPCell(new Phrase("000000", FontFactory.getFont(FontFactory.HELVETICA,4, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase(pref.getPreferences("maintenance_ReferenceNo",""), FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         //cell.setHorizontalAlignment(Element.ALIGN_CENTER); //alignment
-        cell.setBorder(Rectangle.BOTTOM);
+        cell.setBorder(Rectangle.NO_BORDER);
         //cell.setFixedHeight(10); //cell height
         table.addCell(cell);
 
         //Third Line
-        cell = new PdfPCell(new Phrase("PAYMENT   : ", FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase("PAYMENT   : ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         cell.setHorizontalAlignment(Element.ALIGN_RIGHT); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         //cell.setFixedHeight(30); //cell height
@@ -1113,16 +1319,30 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
 
 
         if(radioCash.isChecked()){
-            cell = new PdfPCell(new Phrase("Cash : $" + pref.getPreferences("Amount",""), FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+            cell = new PdfPCell(new Phrase("CASH : $" + jobNewAmount.getText().toString(), FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
             //cell.setHorizontalAlignment(Element.ALIGN_CENTER); //alignment
-            cell.setBorder(Rectangle.BOTTOM);
+            cell.setBorder(Rectangle.NO_BORDER);
             cell.setColspan(2);
             //cell.setFixedHeight(30); //cell height
             table.addCell(cell);
         }else if(radioCheque.isChecked()){
-            cell = new PdfPCell(new Phrase("Cheque : $" + pref.getPreferences("Amount",""), FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+            cell = new PdfPCell(new Phrase("CHEQUE : $" + jobNewAmount.getText().toString(), FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
             //cell.setHorizontalAlignment(Element.ALIGN_CENTER); //alignment
-            cell.setBorder(Rectangle.BOTTOM);
+            cell.setBorder(Rectangle.NO_BORDER);
+            cell.setColspan(2);
+            //cell.setFixedHeight(30); //cell height
+            table.addCell(cell);
+        }else if(radioIB.isChecked()){
+            cell = new PdfPCell(new Phrase("INTERNET BANKING : $" + jobNewAmount.getText().toString(), FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+            //cell.setHorizontalAlignment(Element.ALIGN_CENTER); //alignment
+            cell.setBorder(Rectangle.NO_BORDER);
+            cell.setColspan(2);
+            //cell.setFixedHeight(30); //cell height
+            table.addCell(cell);
+        }else if(radioNone.isChecked()){
+            cell = new PdfPCell(new Phrase(" ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+            //cell.setHorizontalAlignment(Element.ALIGN_CENTER); //alignment
+            cell.setBorder(Rectangle.NO_BORDER);
             cell.setColspan(2);
             //cell.setFixedHeight(30); //cell height
             table.addCell(cell);
@@ -1134,27 +1354,71 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
         Date eightHourBack = cal.getTime();
         String timestamp = new SimpleDateFormat("dd - MMM - yyyy").format(eightHourBack);
 
-        cell = new PdfPCell(new Phrase("DATE   : ", FontFactory.getFont(FontFactory.HELVETICA,4, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase("DATE   : ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         cell.setHorizontalAlignment(Element.ALIGN_RIGHT); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         //cell.setFixedHeight(10); //cell height
         table.addCell(cell);
 
-        cell = new PdfPCell(new Phrase(timestamp, FontFactory.getFont(FontFactory.HELVETICA,4, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase(timestamp, FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         //cell.setHorizontalAlignment(Element.ALIGN_CENTER); //alignment
-        cell.setBorder(Rectangle.BOTTOM);
+        cell.setBorder(Rectangle.NO_BORDER);
         //cell.setFixedHeight(10); //cell height
         table.addCell(cell);
 
+        String technician = pref.getPreferences("maintenance_jobTechnician","");
+        String driver_text = "";
+        if(technician.equals("")){
+            driver_text = pref.getPreferences("driver_name","");
+        }else{
+            driver_text = pref.getPreferences("driver_name","") + ", " + technician;
+        }
+
+
+        //Add Driver and Techinician
+        cell = new PdfPCell(new Phrase("TECHNICIAN   : ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell.setHorizontalAlignment(Element.ALIGN_RIGHT); //alignment
+        cell.setBorder(Rectangle.NO_BORDER);
+        //cell.setFixedHeight(10); //cell height
+        table.addCell(cell);
+
+        cell = new PdfPCell(new Phrase(driver_text.toUpperCase(), FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        //cell.setHorizontalAlignment(Element.ALIGN_CENTER); //alignment
+        cell.setBorder(Rectangle.NO_BORDER);
+        //cell.setFixedHeight(10); //cell height
+        table.addCell(cell);
+
+
+
+        cell = new PdfPCell(new Phrase("  ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell.setHorizontalAlignment(Element.ALIGN_RIGHT); //alignment
+        cell.setBorder(Rectangle.NO_BORDER);
+        //cell.setFixedHeight(10); //cell height
+        table.addCell(cell);
+
+
+        cell = new PdfPCell(new Phrase(" ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        //cell.setHorizontalAlignment(Element.ALIGN_CENTER); //alignment
+        cell.setBorder(Rectangle.NO_BORDER);
+        //cell.setFixedHeight(10); //cell height
+        table.addCell(cell);
+
+        cell = new PdfPCell(new Phrase("", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        //cell.setHorizontalAlignment(Element.ALIGN_CENTER); //alignment
+        cell.setBorder(Rectangle.NO_BORDER);
+        //cell.setFixedHeight(10); //cell height
+        table.addCell(cell);
+
+
        /* //Second Line
-        cell = new PdfPCell(new Phrase("TYPE OF PESTS   : ", FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase("TYPE OF PESTS   : ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         cell.setHorizontalAlignment(Element.ALIGN_RIGHT); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         cell.setPaddingTop(5);
         //cell.setFixedHeight(30); //cell height
         table.addCell(cell);
 
-        cell = new PdfPCell(new Phrase(pestsList.get(i).getPestDesc(), FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase(pestsList.get(i).getPestDesc(), FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         //cell.setHorizontalAlignment(Element.ALIGN_CENTER); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         cell.setColspan(4);
@@ -1163,7 +1427,7 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
         table.addCell(cell);
 
         //Second Line
-        cell = new PdfPCell(new Phrase("AREA CONCERNED   : ", FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase("AREA CONCERNED   : ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         cell.setHorizontalAlignment(Element.ALIGN_RIGHT); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         cell.setPaddingTop(5);
@@ -1180,7 +1444,7 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
             }
         }
 
-        cell = new PdfPCell(new Phrase(areaConcernedBuilder.toString(), FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase(areaConcernedBuilder.toString(), FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         //cell.setHorizontalAlignment(Element.ALIGN_CENTER); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         cell.setColspan(4);
@@ -1189,14 +1453,14 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
         table.addCell(cell);
 
         //Second Line
-        cell = new PdfPCell(new Phrase("TREATMENTS   : ", FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase("TREATMENTS   : ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         cell.setHorizontalAlignment(Element.ALIGN_RIGHT); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         cell.setPaddingTop(5);
         //cell.setFixedHeight(30); //cell height
         table.addCell(cell);
 
-        cell = new PdfPCell(new Phrase(pestsList.get(i).getTreatmentDesc(), FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase(pestsList.get(i).getTreatmentDesc(), FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         //cell.setHorizontalAlignment(Element.ALIGN_CENTER); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         cell.setColspan(4);
@@ -1205,7 +1469,7 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
         table.addCell(cell);
 
         //Second Line
-        cell = new PdfPCell(new Phrase("FINDING   : ", FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase("FINDING   : ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         cell.setHorizontalAlignment(Element.ALIGN_RIGHT); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         cell.setPaddingTop(5);
@@ -1225,7 +1489,7 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
 
         }
 
-        cell = new PdfPCell(new Phrase(findingsBuilder.toString(), FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase(findingsBuilder.toString(), FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         //cell.setHorizontalAlignment(Element.ALIGN_CENTER); //alignment
         //cell.setBorder(Rectangle.NO_BORDER);
         cell.setColspan(4);
@@ -1234,14 +1498,14 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
         table.addCell(cell);
 
         //Second Line
-        cell = new PdfPCell(new Phrase("OTHERS   : ", FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase("OTHERS   : ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         cell.setHorizontalAlignment(Element.ALIGN_RIGHT); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         cell.setPaddingTop(5);
         //cell.setFixedHeight(30); //cell height
         table.addCell(cell);
 
-        cell = new PdfPCell(new Phrase("Bat is BIG and There is a man", FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase("Bat is BIG and There is a man", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         //cell.setHorizontalAlignment(Element.ALIGN_CENTER); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         cell.setColspan(4);
@@ -1249,7 +1513,7 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
         //cell.setFixedHeight(30); //cell height
         table.addCell(cell);
 
-        cell = new PdfPCell(new Phrase("  ", FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase("  ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         //cell.setHorizontalAlignment(Element.ALIGN_CENTER); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         cell.setColspan(5);
@@ -1258,20 +1522,64 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
         table.addCell(cell);
 
         //Second Line
-        cell = new PdfPCell(new Phrase("IMAGES   : ", FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase("IMAGES   : ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         cell.setHorizontalAlignment(Element.ALIGN_RIGHT); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         cell.setPaddingTop(5);
         //cell.setFixedHeight(30); //cell height
         table.addCell(cell);
 
-        cell = new PdfPCell(new Phrase("", FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase("", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         //cell.setHorizontalAlignment(Element.ALIGN_CENTER); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         cell.setColspan(4);
         cell.setPaddingTop(5);
         //cell.setFixedHeight(30); //cell height
         table.addCell(cell);*/
+
+        table.setKeepTogether(true);
+        reportBody.add(table);
+    }
+
+
+    /**
+     * This method is responsible to add table using iText
+     * @param reportBody
+     * @throws BadElementException
+     */
+    private void createAreaConcerned(Paragraph reportBody, int i)
+            throws BadElementException {
+
+        float[] columnWidths = {2,2,2,1,1}; //total 5 columns and their width. The first three columns will take the same width and the fourth one will be 5/2.
+        PdfPTable table = new PdfPTable(columnWidths);
+
+        table.setWidthPercentage(100); //set table with 100% (full page)
+        table.getDefaultCell().setUseAscender(true);
+
+        PdfPCell cell = new PdfPCell(new Phrase("AREAS OF CONCERNED   : ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell.setHorizontalAlignment(Element.ALIGN_RIGHT); //alignment
+        cell.setBorder(Rectangle.NO_BORDER);
+        cell.setPaddingTop(5);
+        //cell.setFixedHeight(30); //cell height
+        table.addCell(cell);
+
+        StringBuilder areaConcernedBuilder = new StringBuilder();
+        for(int j = 0; j < selectedAoc.size(); j++){
+            if(selectedAoc.size() == 1 || j + 1 == selectedAoc.size()){
+                areaConcernedBuilder.append(selectedAoc.get(j).toString());
+            }else{
+                areaConcernedBuilder.append(selectedAoc.get(j).toString());
+                areaConcernedBuilder.append(", ");
+            }
+        }
+
+        cell = new PdfPCell(new Phrase(areaConcernedBuilder.toString().toUpperCase(), FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        //cell.setHorizontalAlignment(Element.ALIGN_CENTER); //alignment
+        cell.setBorder(Rectangle.NO_BORDER);
+        cell.setColspan(4);
+        cell.setPaddingTop(5);
+        //cell.setFixedHeight(30); //cell height
+        table.addCell(cell);
 
         table.setKeepTogether(true);
         reportBody.add(table);
@@ -1285,21 +1593,21 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
     private void createInnerContents(Paragraph reportBody, int i)
             throws BadElementException {
 
-        float[] columnWidths = {1,2,2,1,1}; //total 5 columns and their width. The first three columns will take the same width and the fourth one will be 5/2.
+        float[] columnWidths = {2,2,2,1,1}; //total 5 columns and their width. The first three columns will take the same width and the fourth one will be 5/2.
         PdfPTable table = new PdfPTable(columnWidths);
 
         table.setWidthPercentage(100); //set table with 100% (full page)
         table.getDefaultCell().setUseAscender(true);
 
         //Second Line
-        PdfPCell cell = new PdfPCell(new Phrase("TYPE OF PESTS   : ", FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        PdfPCell cell = new PdfPCell(new Phrase("TYPE OF PESTS   : ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         cell.setHorizontalAlignment(Element.ALIGN_RIGHT); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         cell.setPaddingTop(5);
         //cell.setFixedHeight(30); //cell height
         table.addCell(cell);
 
-        cell = new PdfPCell(new Phrase(pestsList.get(i).getPestDesc(), FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase(pestsList.get(i).getPestDesc().toUpperCase(), FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         //cell.setHorizontalAlignment(Element.ALIGN_CENTER); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         cell.setColspan(4);
@@ -1308,24 +1616,14 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
         table.addCell(cell);
 
         //Second Line
-        cell = new PdfPCell(new Phrase("AREA CONCERNED   : ", FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase("TREATMENTS   : ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         cell.setHorizontalAlignment(Element.ALIGN_RIGHT); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         cell.setPaddingTop(5);
         //cell.setFixedHeight(30); //cell height
         table.addCell(cell);
 
-        StringBuilder areaConcernedBuilder = new StringBuilder();
-        for(int j = 0; j < selectedAoc.size(); j++){
-            if(selectedAoc.size() == 1 || i + 1 == selectedAoc.size()){
-                areaConcernedBuilder.append(selectedAoc.get(j).toString());
-            }else{
-                areaConcernedBuilder.append(selectedAoc.get(j).toString());
-                areaConcernedBuilder.append(", ");
-            }
-        }
-
-        cell = new PdfPCell(new Phrase(areaConcernedBuilder.toString(), FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase(pestsList.get(i).getTreatmentDesc().toUpperCase(), FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         //cell.setHorizontalAlignment(Element.ALIGN_CENTER); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         cell.setColspan(4);
@@ -1334,23 +1632,7 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
         table.addCell(cell);
 
         //Second Line
-        cell = new PdfPCell(new Phrase("TREATMENTS   : ", FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
-        cell.setHorizontalAlignment(Element.ALIGN_RIGHT); //alignment
-        cell.setBorder(Rectangle.NO_BORDER);
-        cell.setPaddingTop(5);
-        //cell.setFixedHeight(30); //cell height
-        table.addCell(cell);
-
-        cell = new PdfPCell(new Phrase(pestsList.get(i).getTreatmentDesc(), FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
-        //cell.setHorizontalAlignment(Element.ALIGN_CENTER); //alignment
-        cell.setBorder(Rectangle.NO_BORDER);
-        cell.setColspan(4);
-        cell.setPaddingTop(5);
-        //cell.setFixedHeight(30); //cell height
-        table.addCell(cell);
-
-        //Second Line
-        cell = new PdfPCell(new Phrase("FINDING   : ", FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase("ACTIONS & FINDINGS   : ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         cell.setHorizontalAlignment(Element.ALIGN_RIGHT); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         cell.setPaddingTop(5);
@@ -1358,7 +1640,7 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
         table.addCell(cell);
 
         StringBuilder findingsBuilder = new StringBuilder();
-        StringBuilder othersBuilder = new StringBuilder();
+        /*StringBuilder othersBuilder = new StringBuilder();
         for(int k = 0; k < findingsList.size(); k++){
             if(findingsList.get(k).getPestDesc().equals(pestsList.get(i).getPestDesc())){
                 if(!findingsList.get(k).getAreaConcerned().equals("Others")){
@@ -1374,45 +1656,85 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
 
             }
 
+        }*/
+
+        for(int k = 0; k < findingsList.size(); k++){
+            if(findingsList.get(k).getPestDesc().equals(pestsList.get(i).getPestDesc())){
+                findingsBuilder.append(findingsList.get(k).getFinalFindings().toString());
+                findingsBuilder.append("\n");
+            }
+
         }
 
-        cell = new PdfPCell(new Phrase(findingsBuilder.toString(), FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase(findingsBuilder.toString().toUpperCase(), FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         //cell.setHorizontalAlignment(Element.ALIGN_CENTER); //alignment
-        //cell.setBorder(Rectangle.NO_BORDER);
-        cell.setColspan(4);
-        cell.setPaddingTop(5);
-        //cell.setFixedHeight(30); //cell height
-        table.addCell(cell);
-
-        //Second Line
-        cell = new PdfPCell(new Phrase("OTHERS   : ", FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
-        cell.setHorizontalAlignment(Element.ALIGN_RIGHT); //alignment
-        cell.setBorder(Rectangle.NO_BORDER);
-        cell.setPaddingTop(5);
-        //cell.setFixedHeight(30); //cell height
-        table.addCell(cell);
-
-        cell = new PdfPCell(new Phrase(othersBuilder.toString(), FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         cell.setBorder(Rectangle.NO_BORDER);
         cell.setColspan(4);
         cell.setPaddingTop(5);
+        //cell.setFixedHeight(30); //cell height
         table.addCell(cell);
 
         /*//Second Line
-        cell = new PdfPCell(new Phrase("IMAGES   : ", FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase("OTHERS   : ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         cell.setHorizontalAlignment(Element.ALIGN_RIGHT); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         cell.setPaddingTop(5);
         //cell.setFixedHeight(30); //cell height
         table.addCell(cell);
 
-        cell = new PdfPCell(new Phrase("", FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase(othersBuilder.toString(), FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell.setBorder(Rectangle.NO_BORDER);
+        cell.setColspan(4);
+        cell.setPaddingTop(5);
+        table.addCell(cell);*/
+
+        /*//Second Line
+        cell = new PdfPCell(new Phrase("IMAGES   : ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell.setHorizontalAlignment(Element.ALIGN_RIGHT); //alignment
+        cell.setBorder(Rectangle.NO_BORDER);
+        cell.setPaddingTop(5);
+        //cell.setFixedHeight(30); //cell height
+        table.addCell(cell);
+
+        cell = new PdfPCell(new Phrase("", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         //cell.setHorizontalAlignment(Element.ALIGN_CENTER); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         cell.setColspan(4);
         cell.setPaddingTop(5);
         //cell.setFixedHeight(30); //cell height
         table.addCell(cell);*/
+
+        //Second Line
+        cell = new PdfPCell(new Phrase(" ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell.setHorizontalAlignment(Element.ALIGN_RIGHT); //alignment
+        cell.setBorder(Rectangle.NO_BORDER);
+        cell.setPaddingTop(5);
+        //cell.setFixedHeight(30); //cell height
+        table.addCell(cell);
+
+        cell = new PdfPCell(new Phrase(" ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        //cell.setHorizontalAlignment(Element.ALIGN_CENTER); //alignment
+        cell.setBorder(Rectangle.NO_BORDER);
+        cell.setColspan(4);
+        cell.setPaddingTop(5);
+        //cell.setFixedHeight(30); //cell height
+        table.addCell(cell);
+
+        //Second Line
+        cell = new PdfPCell(new Phrase(" ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell.setHorizontalAlignment(Element.ALIGN_RIGHT); //alignment
+        cell.setBorder(Rectangle.NO_BORDER);
+        cell.setPaddingTop(5);
+        //cell.setFixedHeight(30); //cell height
+        table.addCell(cell);
+
+        cell = new PdfPCell(new Phrase(" ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        //cell.setHorizontalAlignment(Element.ALIGN_CENTER); //alignment
+        cell.setBorder(Rectangle.NO_BORDER);
+        cell.setColspan(4);
+        cell.setPaddingTop(5);
+        //cell.setFixedHeight(30); //cell height
+        table.addCell(cell);
 
         table.setKeepTogether(true);
         reportBody.add(table);
@@ -1423,29 +1745,40 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
      * @param reportBody
      * @throws BadElementException
      */
-    private void createRemarks(Paragraph reportBody)
+    private void createImages(Paragraph reportBody)
             throws BadElementException {
 
-        File img_Path = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
-                .getPath() + "/" + IMAGE_DIRECTORY_NAME);
+        /*File img_Path = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
+                .getPath() + "/" + IMAGE_DIRECTORY_NAME);*/
 
-        float[] columnWidths = {1,2,2,1,1}; //total 4 columns and their width. The first three columns will take the same width and the fourth one will be 5/2.
+        String root = Environment.getExternalStorageDirectory().toString();
+        File img_Path = new File(root + "/saved_main_pests");
+
+        float[] columnWidths = {1}; //total 4 columns and their width. The first three columns will take the same width and the fourth one will be 5/2.
         PdfPTable table = new PdfPTable(columnWidths);
 
         table.setWidthPercentage(100); //set table with 100% (full page)
         table.getDefaultCell().setUseAscender(true);
 
-        //Second Line
-        PdfPCell cell = new PdfPCell(new Phrase("IMAGES   : ", FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
-        cell.setHorizontalAlignment(Element.ALIGN_RIGHT); //alignment
-        cell.setBorder(Rectangle.NO_BORDER);
-        cell.setPaddingTop(5);
-        //cell.setFixedHeight(30); //cell height
-        table.addCell(cell);
 
+        buildNestedTables(table);
 
+        table.setKeepTogether(true);
+        table.isExtendLastRow(true);
+        reportBody.add(table);
+    }
+
+    private void buildNestedTables(PdfPTable outerTable) {
+
+        String root = Environment.getExternalStorageDirectory().toString();
+        File img_Path = new File(root + "/saved_main_pests");
+        PdfPTable innerTable2 = new PdfPTable(3);
+        outerTable.getDefaultCell().setBorder(0);
+        innerTable2.getDefaultCell().setBorder(0);
+        innerTable2.setWidthPercentage(100);
+        PdfPCell cell;
         cell = new PdfPCell();
-         //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         if(img_Path.exists()){
             String[] fileNames = img_Path.list();
             int imageCount = img_Path.listFiles().length;
@@ -1453,27 +1786,61 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
                 for (int i = 0; i < imageCount; i++) {
                     Log.e("Image : ", img_Path.getPath()+"/"+ fileNames[i]);
                     Image p_img = Image.getInstance(img_Path.getPath()+"/"+ fileNames[i]);
-                    p_img.setWidthPercentage(30);
-                    cell.addElement(p_img);
+                    //cell.addElement(p_img);
+                    p_img.setWidthPercentage(100);
+                    innerTable2.addCell(p_img);
                     //img_Path.getPath()+"/"+ fileNames[i]
                 }
 
             } catch (IOException e) {
                 e.printStackTrace();
                 Log.e("Error PDF : ", String.valueOf(e));
+            } catch (BadElementException e) {
+                e.printStackTrace();
             }
+            while(imageCount % 3 != 0){
+                imageCount++;
+                innerTable2.addCell(" ");
+            }
+
+
         }
-        //cell = new PdfPCell();
-        //cell.addElement(p);
-        //cell.setHorizontalAlignment(Element.ALIGN_CENTER); //alignment
+
+        outerTable.addCell(innerTable2);
+    }
+
+
+
+    /**
+     * This method is responsible to add table using iText
+     * @param reportBody
+     * @throws BadElementException
+     */
+    private void createRemarks(Paragraph reportBody)
+            throws BadElementException {
+
+        /*File img_Path = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
+                .getPath() + "/" + IMAGE_DIRECTORY_NAME);*/
+
+        String root = Environment.getExternalStorageDirectory().toString();
+        File img_Path = new File(root + "/saved_main_pests");
+
+        float[] columnWidths = {2,2,2,1,1}; //total 4 columns and their width. The first three columns will take the same width and the fourth one will be 5/2.
+        PdfPTable table = new PdfPTable(columnWidths);
+
+        table.setWidthPercentage(100); //set table with 100% (full page)
+        table.getDefaultCell().setUseAscender(true);
+
+        //Second Line
+        PdfPCell cell = new PdfPCell(new Phrase(" ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell.setHorizontalAlignment(Element.ALIGN_RIGHT); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
-        cell.setColspan(4);
         cell.setPaddingTop(5);
         //cell.setFixedHeight(30); //cell height
         table.addCell(cell);
 
         //Second Line
-        cell = new PdfPCell(new Phrase("  ", FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase("  ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         cell.setHorizontalAlignment(Element.ALIGN_RIGHT); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         cell.setColspan(5);
@@ -1482,14 +1849,14 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
         table.addCell(cell);
 
         //Second Line
-        cell = new PdfPCell(new Phrase("REMARKS : ", FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase("REMARKS : ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         cell.setHorizontalAlignment(Element.ALIGN_RIGHT); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         cell.setPaddingTop(5);
         //cell.setFixedHeight(30); //cell height
         table.addCell(cell);
 
-        cell = new PdfPCell(new Phrase(jobRemarks.getText().toString(), FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase(jobRemarks.getText().toString().toUpperCase(), FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         //cell.setHorizontalAlignment(Element.ALIGN_CENTER); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         cell.setColspan(4);
@@ -1498,7 +1865,7 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
         table.addCell(cell);
 
         //Second Line
-        cell = new PdfPCell(new Phrase("RECOMMENDATIONS : ", FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase("PEST PREVENTION TIPS : ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         cell.setHorizontalAlignment(Element.ALIGN_RIGHT); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         cell.setPaddingTop(5);
@@ -1511,7 +1878,7 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
             recBuilder.append("\n");
         }
 
-        cell = new PdfPCell(new Phrase(recBuilder.toString(), FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase(recBuilder.toString().toUpperCase(), FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         //cell.setHorizontalAlignment(Element.ALIGN_CENTER); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         cell.setColspan(4);
@@ -1562,7 +1929,7 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
 
 
         //Second Line
-        cell = new PdfPCell(new Phrase("  ", FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase("  ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         cell.setHorizontalAlignment(Element.ALIGN_RIGHT); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         cell.setColspan(1);
@@ -1587,7 +1954,7 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
 
         }
 
-        cell = new PdfPCell(new Phrase("CLIENT NAME / SIGNATURE", FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase("CLIENT NAME / SIGNATURE", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         //cell.setHorizontalAlignment(Element.ALIGN_CENTER); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         cell.setHorizontalAlignment(Element.ALIGN_CENTER);
@@ -1597,7 +1964,7 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
         table.addCell(cell);
 
         //Second Line
-        cell = new PdfPCell(new Phrase("  ", FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase("  ", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         cell.setHorizontalAlignment(Element.ALIGN_RIGHT); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         cell.setColspan(1);
@@ -1605,7 +1972,7 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
         //cell.setFixedHeight(30); //cell height
         table.addCell(cell);
 
-        cell = new PdfPCell(new Phrase("TECHNICIAN NAME / SIGNATURE", FontFactory.getFont(FontFactory.HELVETICA,6, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
+        cell = new PdfPCell(new Phrase("TECHNICIAN NAME / SIGNATURE", FontFactory.getFont(FontFactory.HELVETICA,7, Font.NORMAL))); //Public static Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 12,Font.BOLD);
         //cell.setHorizontalAlignment(Element.ALIGN_CENTER); //alignment
         cell.setBorder(Rectangle.NO_BORDER);
         cell.setHorizontalAlignment(Element.ALIGN_CENTER);
@@ -1623,7 +1990,7 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
 
         final CharSequence[] dialogList = aocList.toArray(new CharSequence[aocList.size()]);
         final AlertDialog.Builder builderDialog = new AlertDialog.Builder(this);
-        builderDialog.setTitle("AREA OF CONCERNED");
+        builderDialog.setTitle("AREAS OF CONCERNED");
         final int count = dialogList.length;
         final boolean[] is_checked = new boolean[count];
 
@@ -1761,11 +2128,11 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
         alert.show();
     }
 
-    private void PestDialog(){
+    private void PestHeaderDialog(){
 
-        final List<String> newPestList = new ArrayList<>(singlePestList);
+        final List<String> headerPestList = new ArrayList<>(singlePestList);
         //newPestList.add("Others");
-        final CharSequence[] dialogList = newPestList.toArray(new CharSequence[newPestList.size()]);
+        final CharSequence[] dialogList = headerPestList.toArray(new CharSequence[headerPestList.size()]);
 
         AlertDialog.Builder mBuilder = new AlertDialog.Builder(MaintenanceDetailActivity.this);
         mBuilder.setTitle("Choose Pest");
@@ -1783,7 +2150,9 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
                 }else{
                     FindingDialog(newPestList.get(i));
                 }*/
-                FindingDialog(newPestList.get(i));
+
+
+                PestDialog(headerPestList.get(i));
                 dialogInterface.dismiss();
 
             }
@@ -1793,29 +2162,106 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
         mDialog.show();
     }
 
-    private void FindingDialog(final String pest){
-        final List<String> newFindingList = new ArrayList<>(selectedAoc);
-        newFindingList.add("Others");
-        newFindingList.add("NO SIGN OF ACTIVE PESTS ACTIVITY");
-        final CharSequence[] dialogList = newFindingList.toArray(new CharSequence[newFindingList.size()]);
+    private void PestDialog(final String header){
+
+        final List<String> newPestList = new ArrayList<>(singlePestList);
+        newPestList.add("Breeding");
+        newPestList.add("Burrows(s)");
+        newPestList.add("Cage");
+        newPestList.add("Dried Leaves");
+        newPestList.add("Dropping(s)");
+        newPestList.add("Food Waste");
+        newPestList.add("Glueboard");
+        newPestList.add("Hives");
+        newPestList.add("Hole(s)");
+        newPestList.add("Infestation");
+        newPestList.add("Rubbish");
+        newPestList.add("Stagnant Water");
+        newPestList.add("Termite Trails");
+        newPestList.add("Treatment");
+        newPestList.add("No Sign of Active Pest Activity");
+        newPestList.add("Others");
+        final CharSequence[] dialogList = newPestList.toArray(new CharSequence[newPestList.size()]);
+
         AlertDialog.Builder mBuilder = new AlertDialog.Builder(MaintenanceDetailActivity.this);
-        mBuilder.setTitle("Choose Area Found");
+        mBuilder.setTitle("Choose Finding");
         mBuilder.setSingleChoiceItems(dialogList, -1, new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialogInterface, int i) {
 
-                //findingsList.add(new Findings(pest, selectedAoc.get(i)));
-                //findingsList.add(new Findings(pest + " FOUND AT " + selectedAoc.get(i)));
-                if(i + 1 == newFindingList.size()){
-                    findingsList.add(new Findings(pest, newFindingList.get(i), newFindingList.get(i)));
+                if(i + 1 == newPestList.size()){
+                    otherPestDialog(header);
+                }else if(i + 2 == newPestList.size()){
+                    findingsList.add(new Findings(header,newPestList.get(i), header + " : " + newPestList.get(i), newPestList.get(i)));
                     findingsAdapter.notifyDataSetChanged();
-                }else if(i + 2 == newFindingList.size()){
-                    othersDialog(pest);
                 }else{
-                    findingsList.add(new Findings(pest, newFindingList.get(i), pest + " FOUND AT " + newFindingList.get(i)));
-                    findingsAdapter.notifyDataSetChanged();
+                    ActionDialog(header,newPestList.get(i));
                 }
 
+                dialogInterface.dismiss();
+
+            }
+        });
+
+        AlertDialog mDialog = mBuilder.create();
+        mDialog.show();
+    }
+
+    private void otherPestDialog(final String header){
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Others Pests");
+
+        final EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_TEXT);
+        builder.setView(input);
+
+        builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                //dismissKeyboard(JobsDetailActivity.this);
+
+                ActionDialog(header,input.getText().toString());
+            }
+        });
+        builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                dismissKeyboard(MaintenanceDetailActivity.this);
+                dialog.cancel();
+            }
+        });
+
+        builder.show();
+    }
+
+    private void ActionDialog(final String header, final String pest){
+        final List<String> newActionList = new ArrayList<>();
+        newActionList.add("Applied");
+        newActionList.add("Found");
+        newActionList.add("Caught");
+        newActionList.add("Destroyed");
+        newActionList.add("Discarded");
+        newActionList.add("Found & Treated");
+        newActionList.add("Placed");
+        newActionList.add("Properly Disposed");
+        newActionList.add("Removed");
+        newActionList.add("Sealed");
+        newActionList.add("Treated");
+        final CharSequence[] dialogList = newActionList.toArray(new CharSequence[newActionList.size()]);
+        AlertDialog.Builder mBuilder = new AlertDialog.Builder(MaintenanceDetailActivity.this);
+        mBuilder.setTitle("Choose Action");
+        mBuilder.setSingleChoiceItems(dialogList, -1, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialogInterface, int i) {
+
+
+                /*if(i + 1 == newActionList.size()){
+                    findingsList.add(new Findings(header,newActionList.get(i), header + " : " + newActionList.get(i), newActionList.get(i)));
+                    findingsAdapter.notifyDataSetChanged();
+                }else{
+                    FindingDialog(header,pest, newActionList.get(i));
+                }*/
+                FindingDialog(header,pest, newActionList.get(i));
 
                 //Toast.makeText(JobsDetailActivity.this, "In " + selectedAoc.get(i) + " ", Toast.LENGTH_SHORT).show();
                 dialogInterface.dismiss();
@@ -1825,6 +2271,63 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
         AlertDialog mDialog = mBuilder.create();
         mDialog.show();
     }
+
+    private void FindingDialog(final String header,final String pest,final String action){
+        final List<String> newFindingList = new ArrayList<>(selectedAoc);
+        newFindingList.add("Others");
+        final CharSequence[] dialogList = newFindingList.toArray(new CharSequence[newFindingList.size()]);
+        AlertDialog.Builder mBuilder = new AlertDialog.Builder(MaintenanceDetailActivity.this);
+        mBuilder.setTitle("Choose Location");
+        mBuilder.setSingleChoiceItems(dialogList, -1, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialogInterface, int i) {
+
+                if(i + 1 == newFindingList.size()){
+                    othersFindingDialog(header,pest, action);
+                }else{
+                    findingsList.add(new Findings(header, newFindingList.get(i), header + " : " + pest + " " + action + " at " + newFindingList.get(i), pest + " " + action + " at " + newFindingList.get(i)));
+                    findingsAdapter.notifyDataSetChanged();
+                }
+
+                //Toast.makeText(JobsDetailActivity.this, "In " + selectedAoc.get(i) + " ", Toast.LENGTH_SHORT).show();
+                dialogInterface.dismiss();
+            }
+        });
+
+        AlertDialog mDialog = mBuilder.create();
+        mDialog.show();
+    }
+
+    private void othersFindingDialog(final String header,final String pest, final String action){
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Others Findings");
+
+        final EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_TEXT);
+        builder.setView(input);
+
+        builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                //dismissKeyboard(JobsDetailActivity.this);
+
+                //findingsList.add(new Findings(pest ,input.getText().toString()));
+                //findingsList.add(new Findings(input.getText().toString()));
+                findingsList.add(new Findings(header, "Others", header + " : " + pest + " " + action + " at " + input.getText().toString(), pest + " " + action + " at " + input.getText().toString()));
+                findingsAdapter.notifyDataSetChanged();
+            }
+        });
+        builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                dismissKeyboard(MaintenanceDetailActivity.this);
+                dialog.cancel();
+            }
+        });
+
+        builder.show();
+    }
+
 
     private void othersDialog(final String pest){
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -1940,55 +2443,88 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
 
     private void postFindings(){
         int j = 1;
-        for(int i = 0; i < findingsList.size(); i++){
-            JSONObject params = new JSONObject();
-            try {
-                params.put("MaintenanceJobID", pref.getPreferences("maintenance_jobID",""));
-                params.put("PestDesc", findingsList.get(i).getPestDesc());
-                params.put("AocDesc", findingsList.get(i).getAreaConcerned());
-                params.put("Findings", findingsList.get(i).getFindings());
-                params.put("ItemNo", j);
+        if(findingsList.size() != 0 ){
+            for(int i = 0; i < findingsList.size(); i++){
+                JSONObject params = new JSONObject();
+                try {
+                    params.put("MaintenanceJobID", pref.getPreferences("maintenance_jobID",""));
+                    params.put("PestDesc", findingsList.get(i).getPestDesc());
+                    params.put("AocDesc", findingsList.get(i).getAreaConcerned());
+                    params.put("Findings", findingsList.get(i).getFindings());
+                    params.put("ItemNo", j);
 
-            } catch (JSONException e) {
-                e.printStackTrace();
+                } catch (JSONException e) {
+                    e.printStackTrace();
 
-            }
-
-            final String url = AppConstant.endpoint_url + "findingsmaintenanceinfo";
-
-            System.out.println(url);
-
-            AQuery aq = new AQuery(this);
-            aq.post(url, params, String.class, new AjaxCallback<String>() {
-                @Override
-                public void callback(String url, String response, AjaxStatus status) {
-                    System.out.println(response);
-                    if (status.getMessage().equals("OK")) {
-
-                    }
                 }
-            }.header("Content-Type", "application/x-www-form-urlencoded")
-                    .header("_method", "POST"));
 
-            j++;
+                final String url = AppConstant.endpoint_url + "findingsmaintenanceinfo";
 
-            if(i + 1 == findingsList.size()){
+                //System.out.println(url);
 
+                AQuery aq = new AQuery(this);
+                aq.post(url, params, String.class, new AjaxCallback<String>() {
+                    @Override
+                    public void callback(String url, String response, AjaxStatus status) {
+                        //System.out.println(response);
+                        if (status.getMessage().equals("OK")) {
+
+                        }
+                    }
+                }.header("Content-Type", "application/x-www-form-urlencoded")
+                        .header("_method", "POST"));
+
+                j++;
+
+                if(i + 1 == findingsList.size()){
+                    hideDialog();
+                    if(imagesList.size() != 0){
+                        for(int k = 0; k < imagesList.size(); k++){
+                            File file = new File(imagesList.get(k).getImage_url());
+                            file.delete();
+
+                            if(k+1 == imagesList.size()){
+                                removePreferences();
+                                Intent intent = new Intent(this, JobActivity.class);
+                                startActivity(intent);
+                                finish();
+
+                                //onBackPressed();
+                            }
+                        }
+                    }else{
+                        removePreferences();
+                        Intent intent = new Intent(this, JobActivity.class);
+                        startActivity(intent);
+                        finish();
+                    }
+
+                }
+            }
+        }else{
+            hideDialog();
+            if(imagesList.size() != 0){
                 for(int k = 0; k < imagesList.size(); k++){
                     File file = new File(imagesList.get(k).getImage_url());
                     file.delete();
 
                     if(k+1 == imagesList.size()){
                         removePreferences();
-                       /* Intent intent = new Intent(this, MaintenanceActivity.class);
+                        Intent intent = new Intent(this, JobActivity.class);
                         startActivity(intent);
-                        finish();*/
+                        finish();
 
-                       onBackPressed();
+                        //onBackPressed();
                     }
                 }
+            }else{
+                removePreferences();
+                Intent intent = new Intent(this, JobActivity.class);
+                startActivity(intent);
+                finish();
             }
         }
+
     }
 
     private void removePreferences(){
@@ -2025,6 +2561,7 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
         pref.removePreferences("maintenance_ImageFill");
         pref.removePreferences("maintenance_jobPest");
         pref.removePreferences("maintenance_AreaCovered");
+        pref.removePreferences("maintenance_jobTechnician");
     }
 
     public class signature extends View {
@@ -2048,8 +2585,8 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
         }
 
         public void save(View v, String StoredPath) {
-            Log.v("log_tag", "Width: " + v.getWidth());
-            Log.v("log_tag", "Height: " + v.getHeight());
+            //Log.v("log_tag", "Width: " + v.getWidth());
+            //Log.v("log_tag", "Height: " + v.getHeight());
             if (bitmap == null) {
                 bitmap = Bitmap.createBitmap(mContent.getWidth(), mContent.getHeight(), Bitmap.Config.RGB_565);
             }
@@ -2154,6 +2691,11 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
     // Function for Digital Signature
     public void dialogSignature(String signature_title, final String Signature_StoredPath, String DIRECTORY) {
 
+        // Dialog Function
+        dialog = new Dialog(MaintenanceDetailActivity.this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setContentView(R.layout.dialog_signature);
+        dialog.setCancelable(true);
         // Method to create Directory, if the Directory doesn't exists
         file = new File(DIRECTORY);
         if (!file.exists()) {
@@ -2204,9 +2746,10 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
 
         mCancel.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                dialog.dismiss();
                 // Calling the same class
-                recreate();
+                mSignature.clear();
+                mGetSign.setEnabled(true);
+                dialog.dismiss();
             }
         });
         dialog.show();
@@ -2233,8 +2776,8 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
         }
 
         public void save(View v, String StoredPath) {
-            Log.v("log_tag", "Width: " + v.getWidth());
-            Log.v("log_tag", "Height: " + v.getHeight());
+            //Log.v("log_tag", "Width: " + v.getWidth());
+            //Log.v("log_tag", "Height: " + v.getHeight());
             if (bitmap_tech == null) {
                 bitmap_tech = Bitmap.createBitmap(mContent_tech.getWidth(), mContent_tech.getHeight(), Bitmap.Config.RGB_565);
             }
@@ -2339,6 +2882,12 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
     // Function for Digital Signature
     public void dialogSecondSignature(String signature_title, final String Signature_StoredPath, String DIRECTORY) {
 
+        // Dialog Function
+        dialog_tech = new Dialog(MaintenanceDetailActivity.this);
+        dialog_tech.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog_tech.setContentView(R.layout.dialog_signature);
+        dialog_tech.setCancelable(true);
+
         // Method to create Directory, if the Directory doesn't exists
         file_tech = new File(DIRECTORY);
         if (!file_tech.exists()) {
@@ -2374,26 +2923,63 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
                 view_tech.setDrawingCacheEnabled(true);
                 mSignature_tech.save(view_tech, Signature_StoredPath);
                 dialog_tech.dismiss();
-                new MaintenanceDetailActivity.uploadClientSignatures().execute();
-                new MaintenanceDetailActivity.uploadTechnicianSignatures().execute();
-                //Log.e("TEST", "test");
-                generatePDF();
-                updateMaintenanceJob();
+
+
+                String client_path = Environment.getExternalStorageDirectory().getPath() + "/SystemPest-MaintenanceClient/" + pref.getPreferences("maintenance_jobID","") + ".png";
+                File client_file = new File(client_path);
+                if(client_file.exists()){
+                    String tech_path = Environment.getExternalStorageDirectory().getPath() + "/SystemPest-MaintenanceTechnician/" + pref.getPreferences("maintenance_jobID","") + ".png";
+                    File tech_file = new File(tech_path);
+                    if(tech_file.exists()){
+                        //Check Internet Connection
+                        if(isNetworkAvailable()){
+                            if(isServerAvailable()){
+                                generatePDF();
+                            }else{
+                                connectionFailedDialog("Connection Failure", "Please try again.");
+                            }
+                        }else{
+                            connectionFailedDialog("Connection Failure", "Please try again.");
+                        }
+                    }else{
+                        connectionFailedDialog("Technician Signature not found.", "Please try again.");
+                    }
+                }else{
+                    connectionFailedDialog("Client Signature not found.", "Please try again.");
+                }
 
             }
         });
 
         mCancel_tech.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
+                mSignature_tech.clear();
                 dialog_tech.dismiss();
                 // Calling the same class
-                recreate();
+                //recreate();
             }
         });
         dialog_tech.show();
     }
 
+    private void connectionFailedDialog(final String title, String message){
+        alert_dialog = new AlertDialog.Builder(this);
+        alert_dialog.setCancelable(true);
+        alert_dialog.setTitle(title);
+        alert_dialog.setMessage(message);
+        alert_dialog.setNegativeButton("Close", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                dialog.dismiss();
+            }
+        });
+        alert_dialog.show();
+
+    }
+
     public class uploadClientSignatures extends AsyncTask<String, Void, Long> {
+
+        boolean isSentPDF = false;
 
         protected Long doInBackground(String... FULL_PATH_TO_LOCAL_FILE) {
             {
@@ -2402,10 +2988,10 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
 
                 String servername = AppConstant.ads_host;
                 int port = 21;
-                String user = "SystemPest_ClientSignatures";
+                String user = "SystemPest_MaintenanceClientSignatures";
                 String pass = "trackacecom";
                 try {
-                    Log.e("START :", "UPLOADING");
+                    //Log.e("START :", "UPLOADING");
                     //System.out.println("Entered Data Upload loop!");
                     ftpClient.connect(servername, 21);
                     ftpClient.login(user, pass);
@@ -2415,15 +3001,15 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
                     reply = ftpClient.getReplyCode();
 
                     if (FTPReply.isPositiveCompletion(reply)) {
-                        System.out.println("Connected Success");
+                       // System.out.println("Connected Success");
                     } else {
-                        System.out.println("Connection Failed");
+                        //System.out.println("Connection Failed");
                         ftpClient.disconnect();
                     }
 
                     try
                     {
-                        Log.e("PROCEEDING :", "UPLOADING");
+                        //Log.e("PROCEEDING :", "UPLOADING");
 
                         ftpClient.enterLocalPassiveMode(); // important!
                         ftpClient.setFileType(ftpClient.BINARY_FILE_TYPE);
@@ -2432,7 +3018,9 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
                         FileInputStream in = new FileInputStream(new File(path));
                         boolean result = ftpClient.storeFile("/"+ pref.getPreferences("maintenance_jobID","") +".png", in);
                         in.close();
-                        if (result) Log.v("upload result", "succeeded");
+                        if (result) {
+                            isSentPDF = true;
+                        }
                         ftpClient.logout();
                         ftpClient.disconnect();
                         //File file = new File(path);
@@ -2456,9 +3044,21 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
                 return null;
             }
         }
+
+        @Override
+        protected void onPostExecute(Long aLong) {
+            super.onPostExecute(aLong);
+            if(!isSentPDF){
+                hideDialog();
+                connectionFailedDialog("Client Signature is not uploaded.","Please try again.");
+            }else{
+                new MaintenanceDetailActivity.uploadTechnicianSignatures().execute();
+            }
+        }
     }
 
     public class uploadTechnicianSignatures extends AsyncTask<String, Void, Long> {
+        boolean isSentPDF = false;
 
         protected Long doInBackground(String... FULL_PATH_TO_LOCAL_FILE) {
             {
@@ -2467,10 +3067,10 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
 
                 String servername = AppConstant.ads_host;
                 int port = 21;
-                String user = "SystemPest_TechnicianSignatures";
+                String user = "SystemPest_MaintenanceTechnicianSignatures";
                 String pass = "trackacecom";
                 try {
-                    Log.e("START :", "UPLOADING");
+                    //Log.e("START :", "UPLOADING");
                     //System.out.println("Entered Data Upload loop!");
                     ftpClient.connect(servername, 21);
                     ftpClient.login(user, pass);
@@ -2480,15 +3080,15 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
                     reply = ftpClient.getReplyCode();
 
                     if (FTPReply.isPositiveCompletion(reply)) {
-                        System.out.println("Connected Success");
+                        //System.out.println("Connected Success");
                     } else {
-                        System.out.println("Connection Failed");
+                        //System.out.println("Connection Failed");
                         ftpClient.disconnect();
                     }
 
                     try
                     {
-                        Log.e("PROCEEDING :", "UPLOADING");
+                        //Log.e("PROCEEDING :", "UPLOADING");
 
                         ftpClient.enterLocalPassiveMode(); // important!
                         ftpClient.setFileType(ftpClient.BINARY_FILE_TYPE);
@@ -2497,7 +3097,7 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
                         FileInputStream in = new FileInputStream(new File(path));
                         boolean result = ftpClient.storeFile("/"+ pref.getPreferences("maintenance_jobID","") +".png", in);
                         in.close();
-                        if (result) Log.v("upload result", "succeeded");
+                        if (result) isSentPDF = true;
                         ftpClient.logout();
                         ftpClient.disconnect();
                         //File file = new File(path);
@@ -2519,6 +3119,17 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
                     //System.out.println("IO Exception!");
                 }
                 return null;
+            }
+        }
+
+        @Override
+        protected void onPostExecute(Long aLong) {
+            super.onPostExecute(aLong);
+            if(!isSentPDF){
+                hideDialog();
+                connectionFailedDialog("Technician Signature is not uploaded.","Please try again.");
+            }else{
+                new MaintenanceDetailActivity.uploadServiceForms().execute();
             }
         }
     }
@@ -2543,19 +3154,136 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
         mDialog.show();
     }
 
+    private void loadMaintenance(){
+
+        final String url = AppConstant.endpoint_url + "maintenanceinfo/" + pref.getPreferences("maintenance_id","");
+        Log.e("Maintenance URL : ", url);
+        // prepare the Request
+        JsonObjectRequest getRequest = new JsonObjectRequest(Request.Method.GET, url, null,
+                new Response.Listener<JSONObject>()
+                {
+                    @Override
+                    public void onResponse(JSONObject response) {
+                        // display response
+                        try{
+                            update_MaintenanceID = response.getInt("MaintenanceID");
+                            update_Timestamp = response.getString("Timestamp");
+                            update_RxTime = response.getString("RxTime");
+                            update_Address = response.getString("Address");
+                            update_Postal = response.getString("Postal");
+                            update_Unit = response.getString("Unit");
+                            update_CusCompany = response.getString("CusCompany");
+                            update_PIC = response.getString("PIC");
+                            update_Phone = response.getString("Phone");
+                            update_Email = response.getString("Email");
+                            update_Site = response.getString("Site");
+                            update_ContractStart = response.getString("ContractStart");
+                            update_ContractEnd = response.getString("ContractEnd");
+                            update_MaintenanceInterval = response.getString("MaintenanceInterval");
+                            update_NotificationInterval = response.getString("NotificationInterval");
+                            update_Remarks = response.getString("Remarks");
+                            update_CompanyID = response.getInt("CompanyID");
+                            update_UserID = response.getInt("UserID");
+                            //String ReferenceNo = response.getString("ReferenceNo");
+                            //int isSent = response.getInt("MaintenanceID");
+
+
+
+                            // adapter.notifyDataSetChanged();
+                        }catch(Exception e){
+                            Log.e("Response Exception :", String.valueOf(e));
+                        }
+
+
+                    }
+                },
+                new Response.ErrorListener()
+                {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+
+                        Log.e("Error.Response", error.toString());
+                    }
+                }
+        );
+
+        // Access the RequestQueue through your singleton class.
+        AppController.getInstance().addToRequestQueue(getRequest);
+
+    }
+
+    private void updateMaintenance(){
+        JSONObject params = new JSONObject();
+
+        try {
+
+            params.put("MaintenanceID", update_MaintenanceID);
+            params.put("CompanyID", update_CompanyID);
+            params.put("Timestamp", update_Timestamp);
+            params.put("RxTime", update_RxTime);
+            params.put("UserID", update_UserID);
+            params.put("Address", update_Address);
+            params.put("Postal", update_Postal);
+            params.put("Unit", update_Unit);
+            params.put("CusCompany", update_CusCompany);
+            params.put("PIC", update_PIC);
+            params.put("Phone", update_Phone);
+            params.put("Email", cusEmail.getText().toString());
+            params.put("Site", update_Site);
+            params.put("ContractStart", update_ContractStart);
+            params.put("ContractEnd", update_ContractEnd);
+            params.put("MaintenanceInterval", update_MaintenanceInterval);
+            params.put("NotificationInterval", update_NotificationInterval);
+            params.put("Remarks", update_Remarks);
+
+        } catch (JSONException e) {
+            e.printStackTrace();
+
+        }
+
+        final String url = AppConstant.endpoint_url + "maintenanceinfo?id=" + update_MaintenanceID;
+
+        //System.out.println(url);
+
+        AQuery aq = new AQuery(this);
+        aq.put(url, params, String.class, new AjaxCallback<String>() {
+            @Override
+            public void callback(String url, String response, AjaxStatus status) {
+                //System.out.println(response);
+                if (status.getMessage().equals("OK")) {
+                    postFindings();
+                }
+            }
+        }.header("Content-Type", "application/x-www-form-urlencoded")
+                .header("_method", "PUT"));
+
+    }
+
     private void updateMaintenanceJob(){
         JSONObject params = new JSONObject();
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(Calendar.getInstance().getTime());
+        cal.add(Calendar.HOUR, -8);
+        Date eightHourBack = cal.getTime();
+        String timestamp = new SimpleDateFormat("dd-MMM-yyyy hh:mm:ss", Locale.ENGLISH).format(eightHourBack);
 
         try {
             params.put("MaintenanceJobID", maintenancejob_MaintenanceJobID);
             params.put("MaintenanceID", maintenancejob_MaintenanceID);
             params.put("AlertDate", maintenancejob_AlertDate);
             params.put("Timestamp", maintenancejob_Timestamp);
-            params.put("RxTime", maintenancejob_RxTime);
+            params.put("RxTime", timestamp);
             params.put("Flag", 0);
             params.put("JobCancelled", maintenancejob_JobCancelled);
             params.put("CancelRemarks", maintenancejob_CancelRemarks);
             params.put("isSent", maintenancejob_isSent);
+            params.put("ReferenceNo", maintenancejob_ReferenceNo);
+            try{
+                params.put("DriverID", pref.getPreferences("driver_id",""));
+
+            }catch(Exception e){
+
+            }
 
         } catch (JSONException e) {
             e.printStackTrace();
@@ -2564,13 +3292,13 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
 
         final String url = AppConstant.endpoint_url + "maintenancejobinfo?ID=" + pref.getPreferences("maintenance_jobID","");
 
-        System.out.println(url);
+        //System.out.println(url);
 
         AQuery aq = new AQuery(this);
         aq.put(url, params, String.class, new AjaxCallback<String>() {
             @Override
             public void callback(String url, String response, AjaxStatus status) {
-                System.out.println(response);
+                //System.out.println(response);
                 if (status.getMessage().equals("OK")) {
                     postFindings();
                 }
@@ -2623,42 +3351,116 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
         AppController.getInstance().addToRequestQueue(getRequest);
     }
 
-    private void sendEmail(String attachment) {
+    private void sendEmail(String attachment, String filename) {
         String sender_address = "";
         String sender_password = "";
-        String[] recipients = { "ljmmagi@gmail.com" };
+        String[] recipients = cusEmail.getText().toString().split(",");
         SendMaintenanceEmailAsyncTask email = new SendMaintenanceEmailAsyncTask();
         email.activity = this;
 
         StringBuilder emailBody = new StringBuilder();
 
-        emailBody.append("Dear Customer, ");
-        emailBody.append("\n");
-        emailBody.append("\n");
-        emailBody.append("Your job has been completed by SystemPest Engineer, Kindly view the attachment file for the reports. ");
-        emailBody.append("\n");
-        emailBody.append("Please do not reply this email. ");
-
         if(pref.getPreferences("maintenance_CompanyID","").equals("1")){
+            emailBody.append("Dear Customer, ");
+            emailBody.append("\n");
+            emailBody.append("\n");
+            emailBody.append("Pest control services has been rendered and completed. Service report as attached.");
+            emailBody.append("\n");
+            emailBody.append("\n");
+            emailBody.append("For any queries, please contact our office directly at 6748 8966.");
+            emailBody.append("\n");
+            emailBody.append("\n");
+            emailBody.append("This email is auto-generated. Do not reply.");
+
             sender_address = "system.sg.report@gmail.com";
-            sender_password = "qwepoi78";
+            //sender_password = "qwepoi78";
+            sender_password = "dfutjlmqsdidmmlj";
         }else if(pref.getPreferences("maintenance_CompanyID","").equals("2")){
+            emailBody.append("Dear Customer, ");
+            emailBody.append("\n");
+            emailBody.append("\n");
+            emailBody.append("Pest control services has been rendered and completed. Service report as attached.");
+            emailBody.append("\n");
+            emailBody.append("\n");
+            emailBody.append("For any queries, please contact our office directly.");
+            emailBody.append("\n");
+            emailBody.append("- Selangor");
+            emailBody.append("\n");
+            emailBody.append("  Tel : 03 - 4142 4866");
+            emailBody.append("\n");
+            emailBody.append("  Email : kualalumpur@systempest.com");
+            emailBody.append("\n");
+            emailBody.append("\n");
+            emailBody.append("- Melaka");
+            emailBody.append("\n");
+            emailBody.append("  Tel : 06 - 336 7366");
+            emailBody.append("\n");
+            emailBody.append("  Email : melaka@systempest.com");
+            emailBody.append("\n");
+            emailBody.append("\n");
+            emailBody.append("- Johor Bahru");
+            emailBody.append("\n");
+            emailBody.append("  Tel : 07 - 353 326");
+            emailBody.append("\n");
+            emailBody.append("  Email : johor@systempest.com");
+            emailBody.append("\n");
+            emailBody.append("\n");
+            emailBody.append("- Perak");
+            emailBody.append("\n");
+            emailBody.append("  Tel : +605 - 312 6166");
+            emailBody.append("\n");
+            emailBody.append("  Email : perak@systempest.com");
+            emailBody.append("\n");
+            emailBody.append("\n");
+            emailBody.append("- Sarawak");
+            emailBody.append("\n");
+            emailBody.append("  Tel : +6082 - 371 366");
+            emailBody.append("\n");
+            emailBody.append("  Email : sarawak@systempest.com");
+            emailBody.append("\n");
+            emailBody.append("\n");
+            emailBody.append("This email is auto-generated. Please do not reply.");
+
             sender_address = "system.my.report@gmail.com";
             sender_password = "qwepoi78";
         }else if(pref.getPreferences("maintenance_CompanyID","").equals("3")){
+            emailBody.append("Dear Customer, ");
+            emailBody.append("\n");
+            emailBody.append("\n");
+            emailBody.append("Pest control services has been rendered and completed. Service report as attached.");
+            emailBody.append("\n");
+            emailBody.append("\n");
+            emailBody.append("For any queries, please contact our office directly at 6841 2023.");
+            emailBody.append("\n");
+            emailBody.append("\n");
+            emailBody.append("This email is auto-generated. Do not reply.");
+
             sender_address = "asiawhiteant.report@gmail.com";
             sender_password = "qwepoi78";
         }else{
+            emailBody.append("Dear Customer, ");
+            emailBody.append("\n");
+            emailBody.append("\n");
+            emailBody.append("Pest control services has been rendered and completed. Service report as attached.");
+            emailBody.append("\n");
+            emailBody.append("\n");
+            emailBody.append("For any queries, please contact our office directly at 6748 8966.");
+            emailBody.append("\n");
+            emailBody.append("\n");
+            emailBody.append("This email is auto-generated. Do not reply.");
+
+
             sender_address = "system.sg.report@gmail.com";
-            sender_password = "qwepoi78";
+            //sender_password = "qwepoi78";
+            sender_password = "dfutjlmqsdidmmlj";
         }
         email.m = new Mail(sender_address, sender_password);
         email.m.set_from(sender_address);
         email.m.setBody(emailBody.toString());
         email.m.set_to(recipients);
-        email.m.set_subject("Do not reply this message");
+        email.m.set_subject("Pest Control Service Report");
         try {
-            email.m.addAttachment(attachment);
+            email.m.addAttachment(attachment, filename);
         } catch (Exception e) {
             Log.e("Attachment Failed : ", String.valueOf(e));
             e.printStackTrace();
@@ -2686,7 +3488,7 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
                                           int monthOfYear, int dayOfMonth) {
 
                         scheduledDate = dayOfMonth + "-" + (monthOfYear + 1) + "-" + year;
-                        Log.e("Scheduled Date : ", scheduledDate);
+                        //Log.e("Scheduled Date : ", scheduledDate);
                         timePickerDialog();
 
                     }
@@ -2709,10 +3511,10 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
                                           int minute) {
 
                         scheduledTime = hourOfDay + ":" + minute;
-                        Log.e("Scheduled Time : ", scheduledTime);
+                        //Log.e("Scheduled Time : ", scheduledTime);
 
 
-                        Log.e("Scheduled Date Time : ", scheduledDate + " " + scheduledTime);
+                        //Log.e("Scheduled Date Time : ", scheduledDate + " " + scheduledTime);
                         rescheduledDialog(scheduledDate + " " + scheduledTime);
                     }
                 }, mHour, mMinute, false);
@@ -2801,7 +3603,7 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
             params.put("Postal", pref.getPreferences("Postal",""));
             params.put("CusEmail", pref.getPreferences("CusEmail",""));
             params.put("Site", pref.getPreferences("Site",""));
-            params.put("ReferenceNo", pref.getPreferences("jobReferenceNo",""));
+            params.put("ReferenceNo", pref.getPreferences("maintenance_ReferenceNo",""));
 
 
 
@@ -2813,13 +3615,13 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
 
         final String url = AppConstant.endpoint_url + "jobinfo";
 
-        System.out.println(url);
+        //System.out.println(url);
 
         AQuery aq = new AQuery(this);
         aq.post(url, params, String.class, new AjaxCallback<String>() {
             @Override
             public void callback(String url, String response, AjaxStatus status) {
-                System.out.println(response);
+                //System.out.println(response);
                 if (status.getMessage().equals("OK")) {
                     try {
                         JSONObject obj = new JSONObject(response);
@@ -2859,13 +3661,13 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
 
         final String url = AppConstant.endpoint_url + "pesttreatmentinfo";
 
-        System.out.println(url);
+        //System.out.println(url);
 
         AQuery aq = new AQuery(this);
         aq.post(url, params, String.class, new AjaxCallback<String>() {
             @Override
             public void callback(String url, String response, AjaxStatus status) {
-                System.out.println(response);
+                //System.out.println(response);
                 if (status.getMessage().equals("OK")) {
 
 
@@ -2876,18 +3678,26 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
     }
 
     public class uploadServiceForms extends AsyncTask<String, Void, Long> {
+        boolean isSentPDF = false;
 
         protected Long doInBackground(String... FULL_PATH_TO_LOCAL_FILE) {
             {
+                Calendar cal = Calendar.getInstance();
+                cal.setTime(Calendar.getInstance().getTime());
+                //Change Timestamp Timezone
+                Date eightHourBack = cal.getTime();
+                String timestamp = new SimpleDateFormat("ddMMMyyyy").format(eightHourBack);
+                String filename = pref.getPreferences("maintenance_jobID","") + "-" + timestamp + ".pdf";
+                String mPath = Environment.getExternalStorageDirectory().getPath() + "/SystemPest-MaintenanceService/"  + "/" + filename;
+
                 FTPClient ftpClient = new FTPClient();
                 int reply;
 
                 String servername = AppConstant.ads_host;
                 int port = 21;
-                String user = "SystemPest_Forms";
+                String user = "SystemPest_MaintenanceForms";
                 String pass = "trackacecom";
                 try {
-                    Log.e("START :", "UPLOADING");
                     //System.out.println("Entered Data Upload loop!");
                     ftpClient.connect(servername, 21);
                     ftpClient.login(user, pass);
@@ -2897,30 +3707,22 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
                     reply = ftpClient.getReplyCode();
 
                     if (FTPReply.isPositiveCompletion(reply)) {
-                        System.out.println("Connected Success");
+                        //System.out.println("Connected Success");
                     } else {
-                        System.out.println("Connection Failed");
+                        //System.out.println("Connection Failed");
                         ftpClient.disconnect();
                     }
 
                     try
                     {
-                        Log.e("PROCEEDING :", "UPLOADING");
 
                         ftpClient.enterLocalPassiveMode(); // important!
                         ftpClient.setFileType(ftpClient.BINARY_FILE_TYPE);
-                        Calendar cal = Calendar.getInstance();
-                        cal.setTime(Calendar.getInstance().getTime());
-                        //Change Timestamp Timezone
-                        Date eightHourBack = cal.getTime();
-                        String timestamp = new SimpleDateFormat("ddMMMyyyy").format(eightHourBack);
-                        String filename = pref.getPreferences("maintenance_jobID","") + "-" + timestamp + ".pdf";
-                        String mPath = Environment.getExternalStorageDirectory().getPath() + "/SystemPest-MaintenanceService/"  + "/" + filename;
 
                         FileInputStream in = new FileInputStream(new File(mPath));
-                        boolean result = ftpClient.storeFile("/"+ pref.getPreferences("maintenance_jobID","") +".png", in);
+                        boolean result = ftpClient.storeFile("/"+ pref.getPreferences("maintenance_jobID","") +".pdf", in);
                         in.close();
-                        if (result) Log.v("upload result", "succeeded");
+                        if (result) isSentPDF = true;
                         ftpClient.logout();
                         ftpClient.disconnect();
                         //File file = new File(path);
@@ -2944,7 +3746,38 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
                 return null;
             }
         }
+
+        @Override
+        protected void onPostExecute(Long aLong) {
+            super.onPostExecute(aLong);
+
+            if(!isSentPDF){
+                hideDialog();
+                connectionFailedDialog("PDF form is not uploaded.","Please try again.");
+            }else{
+                Calendar cal = Calendar.getInstance();
+                cal.setTime(Calendar.getInstance().getTime());
+                Date eightHourBack = cal.getTime();
+                String timestamp = new SimpleDateFormat("ddMMMyyyy").format(eightHourBack);
+                String filename = pref.getPreferences("maintenance_jobID","") + "-" + timestamp + ".pdf";
+                String mPath = Environment.getExternalStorageDirectory().getPath() + "/SystemPest-MaintenanceService/"  + "/" + filename;
+
+                if(pref.getPreferences("maintenance_Email","").equals("")){
+                    updateMaintenance();
+                }
+
+                if(!cusEmail.getText().toString().equals("")){
+                    sendEmail(mPath, filename);
+
+                }
+
+                updateMaintenanceJob();
+
+
+            }
+        }
     }
+
 
     private void backDialog(final String title, String message){
         alert_dialog = new AlertDialog.Builder(this);
@@ -2961,7 +3794,14 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
             @Override
             public void onClick(final DialogInterface dialog, int which) {
                 dialog.dismiss();
-                onBackPressed();
+
+                /*Intent intent = new Intent(MaintenanceDetailActivity.this, MaintenanceActivity.class);
+                startActivity(intent);
+                finish();*/
+
+                Intent intent = new Intent(MaintenanceDetailActivity.this, JobActivity.class);
+                startActivity(intent);
+                finish();
             }
         });
         alert_dialog.show();
@@ -2998,6 +3838,51 @@ public class MaintenanceDetailActivity extends AppCompatActivity implements View
         alert_dialog.show();
 
     }
+
+    public boolean isInternetAvailable() {
+        try {
+            final InetAddress address = InetAddress.getByName("www.google.com");
+            return !address.equals("");
+        } catch (UnknownHostException e) {
+            // Log error
+            Log.e("Unknown Host : " , String.valueOf(e));
+        }
+        return false;
+    }
+
+    public boolean isServerAvailable() {
+        try {
+            InetAddress ipAddr = InetAddress.getByName("117.120.7.120");
+            //You can replace it with your name
+            return !ipAddr.equals("");
+
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean isNetworkAvailable() {
+        ConnectivityManager connectivityManager
+                = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
+        return activeNetworkInfo != null && activeNetworkInfo.isConnected();
+    }
+
+    private void showDialog(){
+        nDialog = new ProgressDialog(MaintenanceDetailActivity.this);
+        nDialog.setMessage("Loading..");
+        nDialog.setTitle("Please Wait...");
+        nDialog.setIndeterminate(false);
+        nDialog.setCancelable(true);
+        nDialog.show();
+    }
+
+    private void hideDialog(){
+        if(nDialog != null){
+            nDialog.dismiss();
+        }
+    }
+
 
 }
 

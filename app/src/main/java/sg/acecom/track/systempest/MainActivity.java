@@ -4,29 +4,27 @@ import android.app.AlertDialog;
 import android.app.Fragment;
 import android.app.FragmentManager;
 import android.app.FragmentTransaction;
-import android.content.BroadcastReceiver;
+import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.IntentFilter;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.CountDownTimer;
-import android.support.v4.content.LocalBroadcastManager;
-import android.support.v7.app.AppCompatActivity;
+
+import androidx.appcompat.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.FrameLayout;
 
-import com.android.volley.Request;
-import com.android.volley.Response;
-import com.android.volley.VolleyError;
-import com.android.volley.toolbox.JsonArrayRequest;
 import com.androidquery.AQuery;
 import com.androidquery.callback.AjaxCallback;
 import com.androidquery.callback.AjaxStatus;
 
-import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -34,19 +32,14 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
-import java.net.URLEncoder;
 import java.net.UnknownHostException;
 import java.text.SimpleDateFormat;
-import java.util.Calendar;
 import java.util.Date;
-import java.util.Locale;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
 import sg.acecom.track.systempest.fragment.MainFragment;
-import sg.acecom.track.systempest.model.Jobs;
 import sg.acecom.track.systempest.util.AppConstant;
-import sg.acecom.track.systempest.util.AppController;
 import sg.acecom.track.systempest.util.IMEI;
 import sg.acecom.track.systempest.util.LocationMonitoringService;
 import sg.acecom.track.systempest.util.MyPreferences;
@@ -64,18 +57,25 @@ public class MainActivity extends AppCompatActivity {
     private String user_speed, user_direction, user_accuracy;
     private Button buttonLogout;
     AlertDialog.Builder alert_dialog;
+    private static String file_url = AppConstant.download_endpoint_url + "app-debug.apk";
+    public static final int progress_bar_type = 0;
+    ProgressDialog pDialog;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN);
         pref = new MyPreferences(this);
+        pDialog = new ProgressDialog(this);
+        alert_dialog = new AlertDialog.Builder(this);
         frameLayout = findViewById(R.id.frameLayout);
         buttonLogout = findViewById(R.id.buttonLogout);
 
         loadFragment(new MainFragment());
 
-        LocalBroadcastManager.getInstance(this).registerReceiver(
+        /*LocalBroadcastManager.getInstance(this).registerReceiver(
                 new BroadcastReceiver() {
                     @Override
                     public void onReceive(Context context, Intent intent) {
@@ -97,7 +97,9 @@ public class MainActivity extends AppCompatActivity {
                         }
                     }
                 }, new IntentFilter(LocationMonitoringService.ACTION_LOCATION_BROADCAST)
-        );
+        );*/
+
+        startService();
 
         buttonLogout.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -105,6 +107,7 @@ public class MainActivity extends AppCompatActivity {
                 logoutAlert();
             }
         });
+
     }
 
     private void loadFragment(Fragment fragment) {
@@ -114,16 +117,39 @@ public class MainActivity extends AppCompatActivity {
         fragmentTransaction.commit(); // save the changes
     }
 
+    private void startService() {
+        if (!isMyServiceRunning(CustomService.class)) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(new Intent(this, CustomService.class));
+            } else {
+                startService(new Intent(this, CustomService.class));
+            }
+        }
+    }
+
+    private boolean isMyServiceRunning(Class<?> serviceClass) {
+        android.app.ActivityManager manager = (android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+        for (android.app.ActivityManager.RunningServiceInfo service : manager.getRunningServices(Integer.MAX_VALUE)) {
+            if (serviceClass.getName().equals(service.service.getClassName())) {
+                Log.i ("Service status", "Running");
+                return true;
+            }
+        }
+        Log.i ("Service status", "Not running");
+        return false;
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
+
         if (!mAlreadyStartedService) {
 
             //Start location sharing service to app server.........
             Intent intent = new Intent(this, LocationMonitoringService.class);
             startService(intent);
 
-            setTimer();
+            //setTimer();
 
             /*myReceiver = new MyReceiver();
             IntentFilter intentFilter = new IntentFilter();
@@ -137,7 +163,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setTimer() {
-        long sec = 15;
+        long sec = 60;
         timer =  new CountDownTimer(TimeUnit.SECONDS.toMillis(sec), 1000) {
             public void onTick(long millisUntilFinished) {
 
@@ -157,13 +183,11 @@ public class MainActivity extends AppCompatActivity {
 
     private void sendGPSData() {
 
-        /*final String gps_message = "$$JDS$," + getDeviceIMEI() + "," + getUTCDateAndTime() + "," + user_lat +
+        final String gps_message = "$$JDS$," + getDeviceIMEI() + "," + getUTCDateAndTime() + "," + user_lat +
                 "," + user_lng + "," + user_speed + "," + user_miles +
-                "," + user_direction + "," + "1" + "," + "0" + "," + "0" + "#";*/
-
-        final String gps_message = "$$JDS$," + getDeviceIMEI() + "," + getUTCDateAndTime() + "," + "1.326329" +
-                "," + "103.896124" + "," + user_speed + "," + user_miles +
                 "," + user_direction + "," + "1" + "," + "0" + "," + "0" + "#";
+
+
 
         //Log.e("GPS :",gps_message);
 
@@ -179,7 +203,7 @@ public class MainActivity extends AppCompatActivity {
                     //socket = new Socket(AppConstant.ads_host, AppConstant.ads_port);
                     dataOutputStream = new DataOutputStream(socket.getOutputStream());
                     dataInputStream = new DataInputStream(socket.getInputStream());
-                    System.out.println("sending data...");
+                   // System.out.println("sending data...");
                     byte[] buf = gps_message.getBytes("UTF-8");
                     dataOutputStream.write(buf, 0, buf.length);
 //                    dataOutputStream.writeUTF(gps_message);
@@ -197,7 +221,7 @@ public class MainActivity extends AppCompatActivity {
                     if (socket != null) {
                         try {
                             socket.close();
-                            System.out.println("socket closed...");
+                            //System.out.println("socket closed...");
                         } catch (IOException e) {
                             Log.e("IO Exception 2 : ", String.valueOf(e));
                             // TODO Auto-generated catch block
@@ -241,9 +265,12 @@ public class MainActivity extends AppCompatActivity {
 
     private String getDeviceIMEI()
     {
-        imei.setDeviceID();
-
-        return imei.getDeviceID();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            return pref.getPreferences("loginIMEI","");
+        } else {
+            imei.setDeviceID("");
+            return imei.getDeviceID();
+        }
     }
 
     private String getUTCDateAndTime() {
@@ -342,9 +369,40 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private String getIMEI(){
-        imei.setDeviceID();
-
-        return imei.getDeviceID();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            return pref.getPreferences("loginIMEI","");
+        } else {
+            imei.setDeviceID("");
+            return imei.getDeviceID();
+        }
     }
+
+    public String getVersionInfo() {
+        String strVersion = "";
+
+        PackageInfo packageInfo;
+        try {
+            packageInfo = getApplicationContext()
+                    .getPackageManager()
+                    .getPackageInfo(
+                            getApplicationContext().getPackageName(),
+                            0
+                    );
+            strVersion += packageInfo.versionName;
+        } catch (PackageManager.NameNotFoundException e) {
+            strVersion += "Unknown ";
+        }
+
+        return strVersion;
+    }
+
+
+
+    @Override
+    public void onBackPressed() {
+        logoutAlert();
+
+    }
+
 
 }

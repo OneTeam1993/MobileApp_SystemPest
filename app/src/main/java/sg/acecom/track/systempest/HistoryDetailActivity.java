@@ -1,17 +1,19 @@
 package sg.acecom.track.systempest;
 
+import android.content.Intent;
 import android.os.Bundle;
-import android.support.annotation.Nullable;
-import android.support.design.widget.FloatingActionButton;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.DefaultItemAnimator;
-import android.support.v7.widget.LinearLayoutManager;
-import android.support.v7.widget.RecyclerView;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.DefaultItemAnimator;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.TextView;
@@ -19,13 +21,12 @@ import android.widget.TextView;
 import com.android.volley.Request;
 import com.android.volley.Response;
 import com.android.volley.VolleyError;
-import com.android.volley.toolbox.JsonArrayRequest;
 import com.android.volley.toolbox.JsonObjectRequest;
+import com.bumptech.glide.Glide;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.net.URLEncoder;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -34,12 +35,10 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
-import sg.acecom.track.systempest.adapter.FindingsAdapter;
 import sg.acecom.track.systempest.adapter.HistoryFindingsAdapter;
 import sg.acecom.track.systempest.adapter.PestAdapter;
 import sg.acecom.track.systempest.adapter.RecommendationsAdapter;
 import sg.acecom.track.systempest.model.Findings;
-import sg.acecom.track.systempest.model.Jobs;
 import sg.acecom.track.systempest.model.Pests;
 import sg.acecom.track.systempest.model.Recommendations;
 import sg.acecom.track.systempest.util.AppConstant;
@@ -60,6 +59,9 @@ public class HistoryDetailActivity extends AppCompatActivity implements View.OnC
     private TextView jobDestination;
     private TextView jobPest;
     private TextView jobAmount;
+    private TextView jobTechnician;
+    private ImageView jobClientSignature;
+    private ImageView jobTechSignature;
     private EditText jobNewAmount;
     private RecyclerView recyclerTreatment;
     private RecyclerView recyclerFindings;
@@ -68,7 +70,11 @@ public class HistoryDetailActivity extends AppCompatActivity implements View.OnC
     private RadioGroup radioPayment;
     private RadioButton radioCash;
     private RadioButton radioCheque;
+    private RadioButton radioIB;
+    private RadioButton radioNone;
     private Button buttonBack;
+    private Button jobServiceForm;
+    private LinearLayout ll_areaCovered;
 
     private PestAdapter pestAdapter;
     private List<Pests> pestsList;
@@ -95,6 +101,7 @@ public class HistoryDetailActivity extends AppCompatActivity implements View.OnC
         jobAreaCovered = findViewById( R.id.jobAreaCovered );
         jobDestination = findViewById( R.id.jobDestination );
         jobPest = findViewById( R.id.jobPest );
+        jobTechnician = findViewById( R.id.jobTechnician );
         jobAmount = findViewById( R.id.jobAmount );
         jobNewAmount = findViewById( R.id.jobNewAmount );
         recyclerTreatment = findViewById( R.id.recyclerTreatment );
@@ -104,7 +111,13 @@ public class HistoryDetailActivity extends AppCompatActivity implements View.OnC
         radioPayment = findViewById( R.id.radioPayment );
         radioCash = findViewById( R.id.radioCash );
         radioCheque = findViewById( R.id.radioCheque );
+        radioIB = findViewById( R.id.radioIB );
+        radioNone = findViewById( R.id.radioNone );
+        jobClientSignature = findViewById( R.id.jobClientSignature );
+        jobTechSignature = findViewById( R.id.jobTechSignature );
         buttonBack = findViewById( R.id.buttonBack );
+        jobServiceForm = findViewById( R.id.jobServiceForm );
+        ll_areaCovered = findViewById( R.id.ll_areaCovered );
 
         pestsList = new ArrayList<>();
         pestAdapter = new PestAdapter(this, pestsList);
@@ -119,12 +132,17 @@ public class HistoryDetailActivity extends AppCompatActivity implements View.OnC
         recyclerFindings.setAdapter(findingsAdapter);
 
         buttonBack.setOnClickListener(this);
+        jobServiceForm.setOnClickListener(this);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        initContent();
+        if(pref.getPreferences("history_jobType","").equals("1")){
+            initContent();
+        }else if(pref.getPreferences("history_jobType","").equals("2")){
+            initContentMaintenance();
+        }
     }
 
     public boolean onOptionsItemSelected(MenuItem item) {
@@ -205,16 +223,161 @@ public class HistoryDetailActivity extends AppCompatActivity implements View.OnC
                             jobNewAmount.setText(response.getString("ReceivedAmount"));
                             jobRemarks.setText(response.getString("Remarks"));
                             jobRecommendation.setText(response.getString("Recommendations"));
-                            jobReference.setText(pref.getPreferences("history_jobReference",""));
+                            jobReference.setText(response.getString("ReferenceNo"));
+                            jobTechnician.setText(response.getString("Technician"));
+
+                            Glide.with(HistoryDetailActivity.this)
+                                    .load(response.getString("ClientSignatures"))
+                                    .into(jobClientSignature);
+
+                            Glide.with(HistoryDetailActivity.this)
+                                    .load(response.getString("TechSignatures"))
+                                    .into(jobTechSignature);
+
+                            pref.savePreferences("jobServiceForm",response.getString("Forms"));
+
                             radioCash.setEnabled(false);
                             radioCheque.setEnabled(false);
+                            radioIB.setEnabled(false);
+                            radioNone.setEnabled(false);
 
                             if(response.getInt("PaymentType") == 1){
                                 radioCash.setChecked(true);
                                 radioCheque.setChecked(false);
+                                radioIB.setChecked(false);
+                                radioNone.setChecked(false);
                             }else if(response.getInt("PaymentType") == 2){
                                 radioCash.setChecked(false);
                                 radioCheque.setChecked(true);
+                                radioIB.setChecked(false);
+                                radioNone.setChecked(false);
+                            }else if(response.getInt("PaymentType") == 3){
+                                radioCash.setChecked(false);
+                                radioCheque.setChecked(false);
+                                radioIB.setChecked(true);
+                                radioNone.setChecked(false);
+                            }else if(response.getInt("PaymentType") == 4){
+                                radioCash.setChecked(false);
+                                radioCheque.setChecked(false);
+                                radioIB.setChecked(false);
+                                radioNone.setChecked(true);
+                            }
+
+                            if(response.getInt("AssetCompanyID") == 2){
+                                ll_areaCovered.setVisibility(View.GONE);
+                            }
+
+                            pestsList.clear();
+                            JSONArray pestArray = new JSONArray(response.getString("Pest"));
+                            for(int j = 0; j < pestArray.length(); j++){
+                                JSONObject pestInfo = pestArray.getJSONObject(j);
+                                pestsList.add(new Pests(pestInfo.getInt("ItemNo"), pestInfo.getString("PestDesc"), pestInfo.getString("TreatmentDesc")));
+                                pestAdapter.notifyDataSetChanged();
+                            }
+
+                            findingsList.clear();
+                            JSONArray findingsArray = new JSONArray(response.getString("Findings"));
+                            for(int k = 0; k < findingsArray.length(); k++){
+                                JSONObject findingInfo = findingsArray.getJSONObject(k);
+                                findingsList.add(new Findings(findingInfo.getString("PestDesc"), findingInfo.getString("AocDesc"), findingInfo.getString("Findings")));
+                                findingsAdapter.notifyDataSetChanged();
+                            }
+
+                            // adapter.notifyDataSetChanged();
+                        }catch(Exception e){
+                            Log.e("Response Exception :", String.valueOf(e));
+                        }
+
+                    }
+                },
+                new Response.ErrorListener()
+                {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+                        Log.e("Error.Response", error.toString());
+                    }
+                }
+        );
+
+        // Access the RequestQueue through your singleton class.
+        AppController.getInstance().addToRequestQueue(getRequest);
+    }
+
+    private void initContentMaintenance(){
+
+        final String url = AppConstant.endpoint_url + "maintenancejobinfo/" + pref.getPreferences("history_jobID","");
+
+        Log.e("History Details API : ", url);
+
+        // prepare the Request
+        JsonObjectRequest getRequest = new JsonObjectRequest(Request.Method.GET, url, null,
+                new Response.Listener<JSONObject>()
+                {
+                    @Override
+                    public void onResponse(JSONObject response) {
+                        // display response
+                        try{
+                            JSONArray arrayPest = response.getJSONArray("Pest");
+                            StringBuilder pestBuilder = new StringBuilder();
+                            StringBuilder treatmentBuilder = new StringBuilder();
+
+                            for(int j = 0; j < arrayPest.length(); j++){
+                                JSONObject pest = arrayPest.getJSONObject(j);
+                                if(arrayPest.length() == 1 || j + 1 == arrayPest.length()){
+                                    pestBuilder.append(pest.getString("PestDesc"));
+                                }else{
+                                    pestBuilder.append(pest.getString("PestDesc"));
+                                    pestBuilder.append(", ");
+                                }
+
+                            }
+
+                            JSONObject objectAc = response.getJSONObject("AcInfo");
+
+                            cusName.setText(response.getString("PIC"));
+                            cusEmail.setText(response.getString("CusEmail"));
+                            jobDateTime.setText(convertDate(response.getString("Timestamp")));
+                            jobAreaCovered.setText(objectAc.getString("GeneralLocation"));
+                            jobDestination.setText(response.getString("Unit") + ", " + response.getString("Destination")
+                                    + ", " + response.getString("Postal"));
+                            jobPest.setText(pestBuilder.toString());
+                            jobAmount.setText(response.getString("Amount"));
+                            jobNewAmount.setText(response.getString("ReceivedAmount"));
+                            jobRemarks.setText(response.getString("Remarks"));
+                            jobRecommendation.setText(response.getString("Recommendations"));
+                            jobReference.setText(response.getString("ReferenceNo"));
+                            jobTechnician.setText(response.getString("Technician"));
+
+                            Glide.with(HistoryDetailActivity.this)
+                                    .load(response.getString("ClientSignatures"))
+                                    .into(jobClientSignature);
+
+                            Glide.with(HistoryDetailActivity.this)
+                                    .load(response.getString("TechSignatures"))
+                                    .into(jobTechSignature);
+
+                            pref.savePreferences("jobServiceForm",response.getString("Forms"));
+
+                            radioCash.setEnabled(false);
+                            radioCheque.setEnabled(false);
+                            radioIB.setEnabled(false);
+
+                            if(response.getInt("PaymentType") == 1){
+                                radioCash.setChecked(true);
+                                radioCheque.setChecked(false);
+                                radioIB.setChecked(false);
+                            }else if(response.getInt("PaymentType") == 2){
+                                radioCash.setChecked(false);
+                                radioCheque.setChecked(true);
+                                radioIB.setChecked(false);
+                            }else if(response.getInt("PaymentType") == 3){
+                                radioCash.setChecked(false);
+                                radioCheque.setChecked(false);
+                                radioIB.setChecked(true);
+                            }
+
+                            if(response.getInt("AssetCompanyID") == 2){
+                                ll_areaCovered.setVisibility(View.GONE);
                             }
 
                             pestsList.clear();
@@ -259,6 +422,11 @@ public class HistoryDetailActivity extends AppCompatActivity implements View.OnC
             case(R.id.buttonBack):
                 pref.removePreferences("history_jobID");
                 onBackPressed();
+                break;
+
+            case(R.id.jobServiceForm):
+                Intent pdfIntent = new Intent(this, PDFActivity.class);
+                startActivity(pdfIntent);
                 break;
         }
     }

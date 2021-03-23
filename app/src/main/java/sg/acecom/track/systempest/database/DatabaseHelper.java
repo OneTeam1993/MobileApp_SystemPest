@@ -46,7 +46,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         onCreate(db);
     }
 
-    public long insertNote(int itemID, String name, String reference, String quantity, String price, String unit) {
+    public long insertNote(int itemID, String name, String reference, String quantity, String price, String unit, String stockout) {
         // get writable database as we want to write data
         SQLiteDatabase db = this.getWritableDatabase();
 
@@ -59,6 +59,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         values.put(InventoryDB.COLUMN_QUANTITY, quantity);
         values.put(InventoryDB.COLUMN_PRICE, price);
         values.put(InventoryDB.COLUMN_UNIT, unit);
+        values.put(InventoryDB.COLUMN_STOCKOUT, stockout);
 
         // insert row
         long id = db.insert(InventoryDB.TABLE_NAME, null, values);
@@ -76,7 +77,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
         Cursor cursor = db.query(InventoryDB.TABLE_NAME,
                 new String[]{InventoryDB.COLUMN_ID, InventoryDB.COLUMN_ITEM_ID, InventoryDB.COLUMN_NAME, InventoryDB.COLUMN_REFERENCE
-                        , InventoryDB.COLUMN_QUANTITY, InventoryDB.COLUMN_PRICE, InventoryDB.COLUMN_UNIT},
+                        , InventoryDB.COLUMN_QUANTITY, InventoryDB.COLUMN_PRICE, InventoryDB.COLUMN_UNIT, InventoryDB.COLUMN_STOCKOUT},
                 InventoryDB.COLUMN_ID + "=?",
                 new String[]{String.valueOf(id)}, null, null, null, null);
 
@@ -91,7 +92,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 cursor.getString(cursor.getColumnIndex(InventoryDB.COLUMN_REFERENCE)),
                 cursor.getString(cursor.getColumnIndex(InventoryDB.COLUMN_QUANTITY)),
                 cursor.getString(cursor.getColumnIndex(InventoryDB.COLUMN_PRICE)),
-                cursor.getString(cursor.getColumnIndex(InventoryDB.COLUMN_UNIT)));
+                cursor.getString(cursor.getColumnIndex(InventoryDB.COLUMN_UNIT)),
+                cursor.getString(cursor.getColumnIndex(InventoryDB.COLUMN_STOCKOUT)));
 
         // close the db connection
         cursor.close();
@@ -119,6 +121,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 inventory.setItemQuantity(cursor.getString(cursor.getColumnIndex(InventoryDB.COLUMN_QUANTITY)));
                 inventory.setItemPrice(cursor.getString(cursor.getColumnIndex(InventoryDB.COLUMN_PRICE)));
                 inventory.setItemUnit(cursor.getString(cursor.getColumnIndex(InventoryDB.COLUMN_UNIT)));
+                inventory.setItemStockout(cursor.getString(cursor.getColumnIndex(InventoryDB.COLUMN_STOCKOUT)));
 
                 inventories.add(inventory);
             } while (cursor.moveToNext());
@@ -153,10 +156,11 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         values.put(InventoryDB.COLUMN_QUANTITY, String.valueOf(inventory.getItemQuantity()));
         values.put(InventoryDB.COLUMN_PRICE, String.valueOf(inventory.getItemPrice()));
         values.put(InventoryDB.COLUMN_UNIT, String.valueOf(inventory.getItemUnit()));
+        values.put(InventoryDB.COLUMN_STOCKOUT, String.valueOf(inventory.getItemStockout()));
 
         // updating row
-        return db.update(InventoryDB.TABLE_NAME, values, InventoryDB.COLUMN_ID + " = ?",
-                new String[]{String.valueOf(inventory.getDb_ID())});
+        return db.update(InventoryDB.TABLE_NAME, values, InventoryDB.COLUMN_ITEM_ID + " = ?",
+                new String[]{String.valueOf(inventory.getItemID())});
     }
 
     public void deleteInventory(Inventory inventory) {

@@ -1,16 +1,12 @@
 package sg.acecom.track.systempest.adapter;
 
 import android.app.Activity;
-import android.app.AlertDialog;
-import android.content.DialogInterface;
-import android.content.Intent;
-import android.net.Uri;
-import android.support.v7.widget.RecyclerView;
+
+import androidx.recyclerview.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.AlphaAnimation;
-import android.widget.Button;
 import android.widget.Filter;
 import android.widget.Filterable;
 import android.widget.TextView;
@@ -23,7 +19,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
-import sg.acecom.track.systempest.JobsDetailActivity;
 import sg.acecom.track.systempest.R;
 import sg.acecom.track.systempest.model.Jobs;
 import sg.acecom.track.systempest.util.MyPreferences;
@@ -42,7 +37,7 @@ public class HistoryJobAdapter extends RecyclerView.Adapter<HistoryJobAdapter.My
     private HistoryJobAdapterListenner listener;
 
     public class MyViewHolder extends RecyclerView.ViewHolder {
-        public TextView jobDateTime, jobAddress, jobCustomer, jobPest;
+        public TextView jobDateTime, jobAddress, jobCustomer, jobPest, jobTechnician, jobFormType, jobType;
         public View jobView;
 
         public MyViewHolder(View view) {
@@ -52,6 +47,9 @@ public class HistoryJobAdapter extends RecyclerView.Adapter<HistoryJobAdapter.My
             jobAddress = view.findViewById(R.id.jobAddress);
             jobCustomer = view.findViewById(R.id.jobCustomer);
             jobPest = view.findViewById(R.id.jobPest);
+            jobTechnician = view.findViewById(R.id.jobTechnician);
+            jobFormType = view.findViewById(R.id.jobFormType);
+            jobType = view.findViewById(R.id.jobType);
 
             view.setOnClickListener(new View.OnClickListener() {
                 @Override
@@ -92,7 +90,27 @@ public class HistoryJobAdapter extends RecyclerView.Adapter<HistoryJobAdapter.My
         holder.jobCustomer.setText(jobs.getPIC());
         holder.jobPest.setText(jobs.getPest());
         holder.jobView.setBackgroundResource(R.color.job_status_completed);
+        holder.jobTechnician.setText(jobs.getTechnician());
+        if(jobs.getJobType() == 1){
+            holder.jobType.setText("Ad-Hoc");
+        }else if(jobs.getJobType() == 2){
+            holder.jobType.setText("Maintenance");
+        }
 
+        switch(jobs.getFormType()){
+            case(1):
+                holder.jobFormType.setText("System Pest Singapore");
+                break;
+
+            case(2):
+                holder.jobFormType.setText("System Pest Malaysia");
+                break;
+
+            case(3):
+                holder.jobFormType.setText("Asia White Ants");
+                break;
+
+        }
     }
 
     private String convertDate(String date)

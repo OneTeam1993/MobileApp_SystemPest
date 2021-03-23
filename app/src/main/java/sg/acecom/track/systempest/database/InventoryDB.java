@@ -13,6 +13,7 @@ public class InventoryDB {
     public static final String COLUMN_QUANTITY = "quantity";
     public static final String COLUMN_PRICE = "price";
     public static final String COLUMN_UNIT = "unit";
+    public static final String COLUMN_STOCKOUT = "stockout";
 
     // Create table SQL query
     public static final String CREATE_TABLE =
@@ -23,7 +24,8 @@ public class InventoryDB {
                     + COLUMN_REFERENCE + " TEXT,"
                     + COLUMN_QUANTITY + " TEXT,"
                     + COLUMN_PRICE + " TEXT,"
-                    + COLUMN_UNIT + " TEXT"
+                    + COLUMN_UNIT + " TEXT,"
+                    + COLUMN_STOCKOUT + " TEXT"
                     + ")";
 
 }

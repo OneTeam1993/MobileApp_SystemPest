@@ -2,8 +2,10 @@ package sg.acecom.track.systempest.util;
 
 import android.content.Context;
 import android.graphics.Color;
-import android.support.design.widget.Snackbar;
-import android.support.v4.content.ContextCompat;
+import com.google.android.material.snackbar.Snackbar;
+import androidx.core.content.ContextCompat;
+import sg.acecom.track.systempest.R;
+
 import android.text.TextUtils;
 import android.view.View;
 import android.widget.Button;
@@ -97,13 +99,13 @@ public class SnackBarUtil
             // Changing snackbar text color
 
             View snackView = snackbar.getView();
-            TextView textView = (TextView) snackView.findViewById(android.support.design.R.id.snackbar_text);
+            TextView textView = (TextView) snackView.findViewById(R.id.snackbar_text);
             if (!TextUtils.isEmpty(textColor))
                 textView.setTextColor(Color.parseColor(textColor));
 
             // Changing Action button text color
 
-            Button snackViewButton = (Button) snackView.findViewById(android.support.design.R.id.snackbar_action);
+            Button snackViewButton = (Button) snackView.findViewById(R.id.snackbar_action);
             if (!TextUtils.isEmpty(actionColor))
                 snackViewButton.setTextColor(Color.parseColor(actionColor));
         }
@@ -133,13 +135,13 @@ public class SnackBarUtil
                 // Changing snackbar text color
 
                 View snackView = snackbar.getView();
-                TextView textView = (TextView) snackView.findViewById(android.support.design.R.id.snackbar_text);
+                TextView textView = (TextView) snackView.findViewById(R.id.snackbar_text);
                 if (textColor!=0)
                     textView.setTextColor(ContextCompat.getColor(context, textColor));
 
                 // Changing Action button text color
 
-                Button snackViewButton = (Button) snackView.findViewById(android.support.design.R.id.snackbar_action);
+                Button snackViewButton = (Button) snackView.findViewById(R.id.snackbar_action);
                 if (textColor>0)
                     snackViewButton.setTextColor(ContextCompat.getColor(context, actionColor));
             }
